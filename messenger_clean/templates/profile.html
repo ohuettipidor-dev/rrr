@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="manifest" href="/static/manifest.json">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Messenger">
+    <meta name="theme-color" content="#2ea6ff">
+    <title>Профиль - Мессенджер</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: system-ui;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .card {
+            background: #17212b;
+            border-radius: 20px;
+            padding: 40px;
+            max-width: 500px;
+            width: 100%;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            text-align: center;
+        }
+        .avatar-large {
+            width: 120px;
+            height: 120px;
+            border-radius: 50%;
+            margin: 0 auto 20px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 48px;
+            font-weight: bold;
+            color: white;
+            overflow: hidden;
+        }
+        .avatar-large img { width: 100%; height: 100%; object-fit: cover; }
+        h2 { color: white; margin-bottom: 20px; }
+        .info { color: #7f8c8d; margin-bottom: 30px; font-size: 14px; }
+        .upload-form, .theme-form, .notifications-form, .delete-form { margin-bottom: 30px; }
+        .file-input { margin: 20px 0; }
+        .btn, select, input[type="file"] {
+            background: #2ea6ff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 14px;
+            text-decoration: none;
+            display: inline-block;
+            margin: 5px;
+        }
+        .btn-secondary {
+            background: transparent;
+            border: 1px solid #2ea6ff;
+            color: #2ea6ff;
+        }
+        .btn-danger {
+            background: #e74c3c;
+            border: none;
+        }
+        select { background: #242f3d; color: white; }
+        .flash {
+            padding: 12px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+        }
+        .flash-success { background: rgba(46,204,113,0.2); border: 1px solid #2ecc71; color: #2ecc71; }
+        .flash-danger { background: rgba(231,76,60,0.2); border: 1px solid #e74c3c; color: #e74c3c; }
+        .checkbox-label {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <div class="avatar-large">
+            {% if user.avatar != 'default.png' %}
+                <img src="/static/uploads/avatars/{{ user.avatar }}">
+            {% else %}
+                {{ user.username[0].upper() }}
+            {% endif %}
+        </div>
+        <h2>{{ user.username }}</h2>
+        <div class="info">
+            <p>ID: {{ user.id }}</p>
+            <p>Статус: {% if user.status == 'online' %}онлайн{% else %}офлайн{% endif %}</p>
+            <p>Последний раз: {{ user.last_seen.strftime('%d.%m.%Y %H:%M') if user.last_seen else 'неизвестно' }}</p>
+        </div>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="flash flash-{{ category }}">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <div class="upload-form">
+            <form method="POST" enctype="multipart/form-data">
+                <div class="file-input">
+                    <input type="file" name="avatar" accept="image/*" required>
+                </div>
+                <button type="submit" class="btn">Загрузить аватар</button>
+            </form>
+        </div>
+
+        <div class="theme-form">
+            <form method="POST">
+                <select name="theme">
+                    <option value="dark" {% if user.theme == 'dark' %}selected{% endif %}>Тёмная</option>
+                    <option value="light" {% if user.theme == 'light' %}selected{% endif %}>Светлая</option>
+                </select>
+                <button type="submit" class="btn">Сохранить тему</button>
+            </form>
+        </div>
+
+        <div class="notifications-form">
+            <form method="POST">
+                <label class="checkbox-label">
+                    <input type="checkbox" name="push_enabled" {% if user.push_enabled %}checked{% endif %}>
+                    Включить уведомления
+                </label>
+                <button type="submit" class="btn">Сохранить</button>
+            </form>
+        </div>
+
+        <div class="delete-form">
+            <form action="/delete_account" method="POST" onsubmit="return confirm('Вы уверены? Все ваши сообщения и данные будут удалены без возможности восстановления.')">
+                <button type="submit" class="btn btn-danger">Удалить аккаунт</button>
+            </form>
+        </div>
+
+        <div style="margin-top: 20px;">
+            <a href="/group/new" class="btn btn-secondary">➕ Создать группу</a>
+        </div>
+
+        <a href="/chat" class="btn btn-secondary">Вернуться в чат</a>
+    </div>
+</body>
+</html>

@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="manifest" href="/static/manifest.json">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Messenger">
+    <meta name="theme-color" content="#2ea6ff">
+    <title>Вход - Мессенджер</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .login-card {
+            background: #17212b;
+            border-radius: 20px;
+            padding: 40px;
+            max-width: 400px;
+            width: 90%;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        h2 {
+            color: white;
+            text-align: center;
+            margin-bottom: 32px;
+            font-size: 24px;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        input {
+            width: 100%;
+            padding: 14px 16px;
+            background: #242f3d;
+            border: none;
+            border-radius: 12px;
+            color: white;
+            font-size: 14px;
+            outline: none;
+            transition: all 0.3s;
+        }
+        input:focus {
+            background: #2b2f36;
+        }
+        input::placeholder {
+            color: #7f8c8d;
+        }
+        button {
+            width: 100%;
+            padding: 14px;
+            background: #2ea6ff;
+            border: none;
+            border-radius: 12px;
+            color: white;
+            font-size: 16px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background 0.3s;
+            margin-top: 12px;
+        }
+        button:hover {
+            background: #1e8ae6;
+        }
+        .alert {
+            padding: 12px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            font-size: 14px;
+        }
+        .alert-danger {
+            background: rgba(231, 76, 60, 0.2);
+            border: 1px solid #e74c3c;
+            color: #e74c3c;
+        }
+        .alert-success {
+            background: rgba(46, 204, 113, 0.2);
+            border: 1px solid #2ecc71;
+            color: #2ecc71;
+        }
+        .register-link {
+            text-align: center;
+            margin-top: 24px;
+            color: #7f8c8d;
+            font-size: 14px;
+        }
+        .register-link a {
+            color: #2ea6ff;
+            text-decoration: none;
+        }
+        .register-link a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="login-card">
+        <h2>Вход в аккаунт</h2>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }}">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <form method="POST">
+            <div class="form-group">
+                <input type="text" name="username" placeholder="Имя пользователя" required>
+            </div>
+            <div class="form-group">
+                <input type="password" name="password" placeholder="Пароль" required>
+            </div>
+            <button type="submit">Войти</button>
+        </form>
+
+        <div class="register-link">
+            Нет аккаунта? <a href="/register">Зарегистрируйтесь</a>
+        </div>
+    </div>
+</body>
+</html>
