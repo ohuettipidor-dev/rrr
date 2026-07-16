@@ -3,33 +3,40 @@
 import { writeFile } from './neuron_github.js';
 
 let lastErrorFixed = null; // Время последней авто-починки
+let tokenRequested = false; // Запрашивали ли мы уже токен
+
+// Функция для добавления сообщения в чат
+function addMsgToChat(role, text) {
+    const chatEl = document.getElementById("chat");
+    if (!chatEl) return;
+    const div = document.createElement("div");
+    div.className = `msg ${role}`;
+    div.innerHTML = `<div class="bubble">${text.replace(/\n/g, "<br>")}</div>`;
+    chatEl.appendChild(div);
+    chatEl.scrollTop = chatEl.scrollHeight;
+}
 
 export async function process(prompt) {
-    // Анализатор не реагирует на текстовые команды. Он работает в фоновом режиме.
     return null;
 }
 
-// Запуск фонового наблюдателя за чатом.
 export function startAnalyzer() {
     console.log("🔍 Анализатор активирован. Ожидаю ошибки...");
 
     setInterval(async () => {
-        // Ищем все сообщения бота на странице
         const botMessages = document.querySelectorAll('.bot .bubble');
         for (const msg of botMessages) {
             const text = msg.textContent;
-            // Если видим ошибку Интеллекта
             if (text.includes('⚠ Облачный разум временно перегружен')) {
-                // Проверяем, не чинили ли мы это недавно (защита от бесконечного цикла)
                 const now = Date.now();
                 if (lastErrorFixed && (now - lastErrorFixed < 60000)) {
-                    console.log("⏳ Анализатор: исправление уже применялось менее минуты назад. Жду.");
+                    console.log("⏳ Анализатор: недавно уже чинили. Жду.");
                     return;
                 }
-                console.log("🚨 Анализатор: обнаружена ошибка Интеллекта. Запускаю протокол исправления...");
+                console.log("🚨 Анализатор: обнаружена ошибка Интеллекта. Запускаю исправление...");
                 lastErrorFixed = now;
 
-                // Новый код Интеллекта с резервным API OpenRouter
+                // Новый код Интеллекта с резервным API
                 const newIntellectCode = `// Нейрон 3: Интеллект (с резервным API)
 const conversationHistory = [];
 
@@ -39,7 +46,6 @@ export async function process(prompt) {
         conversationHistory.splice(0, conversationHistory.length - 6);
     }
 
-    // Пул API (основной и резервный)
     const apiPool = [
         {
             name: "Pollinations",
@@ -104,8 +110,11 @@ export async function process(prompt) {
                     newIntellectCode,
                     '🛡 Авто-фикс Анализатора: добавлен резервный API'
                 );
+
+                // Показываем результат в чате
+                addMsgToChat('bot', `🛠 Анализатор: обнаружена ошибка. Автоматическое исправление:\n${result}`);
                 console.log("🛠 Анализатор: " + result);
             }
         }
-    }, 10000); // Проверяем чат каждые 10 секунд
+    }, 10000);
 }
