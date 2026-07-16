@@ -1,4 +1,4 @@
-// Диспетчер Роя
+// Диспетчер Роя (с защитой от ошибок)
 import { process as reflex } from './neuron_reflex.js';
 import { process as sensors } from './neuron_sensors.js';
 import { process as intellect } from './neuron_intellect.js';
@@ -10,7 +10,6 @@ const NEURONS = [
 ];
 
 export async function dispatch(prompt) {
-    // Сортируем по приоритету
     const sorted = [...NEURONS].sort((a, b) => a.priority - b.priority);
     for (const neuron of sorted) {
         try {
@@ -18,7 +17,8 @@ export async function dispatch(prompt) {
             if (result !== null) return result;
         } catch (e) {
             console.error(`Ошибка в нейроне ${neuron.name}:`, e);
+            // Не падаем, идём к следующему нейрону
         }
     }
-    return "🤔 Ни один нейрон не смог ответить.";
-      }
+    return "🤔 Ни один нейрон не смог ответить. Попробуй переформулировать.";
+}
