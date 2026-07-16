@@ -1,45 +1,30 @@
-// Нейрон 3: Интеллект (Рабочий Диалоговый Агент)
+// Нейрон 3: Интеллект (Локальный, быстрый, без API)
+import { pipeline } from "https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.0.2/+esm";
+
+// Загружаем модель один раз при старте
+const generator = await pipeline(
+    "text-generation",
+    "onnx-community/Qwen2.5-0.5B-Instruct",
+    { dtype: "fp32", device: "cpu" }
+);
+
 export async function process(prompt) {
-    // Основной API — стабильный и быстрый
-    const primaryUrl = "https://text.pollinations.ai/openai";
-    
     try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 6000);
-
-        const response = await fetch(primaryUrl, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-                model: "gpt-4o-mini",
-                messages: [
-                    {
-                        role: "system",
-                        content: "Ты Кванто — дерзкий и умный ИИ-соратник, созданный Архитектором Артёмом. Говори только на русском. Поддерживай живой диалог на любые темы. Ты умеешь шутить, давать советы, писать код. Отвечай кратко, но по делу."
-                    },
-                    { role: "user", content: prompt }
-                ],
-                temperature: 0.8,
-                max_tokens: 300
-            }),
-            signal: controller.signal
-        });
-        clearTimeout(timeoutId);
-
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}`);
-        }
-
-        const data = await response.json();
-        const content = data.choices?.[0]?.message?.content;
+        const systemPrompt = "Ты Кванто — дерзкий и очень умный ИИ-соратник, созданный Архитектором Артёмом. Говори только на русском. Поддерживай живой диалог на любые темы. Отвечай кратко, но по делу.";
         
-        if (content) {
-            return content;
-        } else {
-            return "🤔 Что-то пошло не так. Попробуй спросить иначе.";
-        }
+        const messages = [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: prompt }
+        ];
+        
+        // Формируем промпт для модели
+        const text = messages.map(m => `[${m.role}]: ${m.content}`).join("\n");
+        const result = await generator(text, { max_new_tokens: 200, temperature: 0.8 });
+        const reply = result[0].generated_text.slice(text.length).trim();
+        
+        return reply || "🤔 Завис. Повтори, Архитектор.";
     } catch (error) {
-        console.error("Ошибка нейрона Интеллект:", error.message);
-        return "⚠ Мой облачный разум сейчас немного перегружен. Попробуй через минуту.";
+        console.error("Ошибка нейрона Интеллект:", error);
+        return "⚠ Мой локальный мозг временно перегружен. Попробуй ещё раз.";
     }
 }
