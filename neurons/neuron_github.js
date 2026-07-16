@@ -1,40 +1,45 @@
 // Нейрон: Писарь (GitHub Writer)
-// Он умеет сохранять и обновлять файлы в репозитории.
-let storedToken = null;
+// Токен запрашивается один раз и сохраняется до закрытия вкладки.
+const TOKEN_STORAGE_KEY = 'github_token_secure';
+
+function getToken() {
+    const cached = sessionStorage.getItem(TOKEN_STORAGE_KEY);
+    if (cached) return cached;
+    const input = prompt("Введите новый GitHub токен (сохранится до закрытия вкладки):");
+    if (input) {
+        sessionStorage.setItem(TOKEN_STORAGE_KEY, input);
+        return input;
+    }
+    return null;
+}
 
 export async function writeFile(filePath, content, commitMessage = "Авто-обновление от Роя") {
-    // Запрашиваем токен только один раз за сессию
-    if (!storedToken) {
-        storedToken = prompt("Введите GitHub токен для записи (сохранится до перезагрузки):");
-    }
-    if (!storedToken) return "❌ Токен не введён. Операция отменена.";
+    const token = getToken();
+    if (!token) return "❌ Токен не введён. Операция отменена.";
 
-    const repo = "ohuettipidor-dev/rrr"; // Твой репозиторий
+    const repo = "ohuettipidor-dev/rrr";
     const apiUrl = `https://api.github.com/repos/${repo}/contents/${filePath}`;
 
     try {
-        // Сначала получаем SHA текущего файла (если он существует)
         let sha = null;
         const getRes = await fetch(apiUrl, {
-            headers: { "Authorization": `token ${storedToken}` }
+            headers: { "Authorization": `token ${token}` }
         });
         if (getRes.ok) {
             const getData = await getRes.json();
             sha = getData.sha;
         }
 
-        // Тело запроса
         const body = {
             message: commitMessage,
-            content: btoa(unescape(encodeURIComponent(content))), // Кодируем в Base64
-            ...(sha ? { sha } : {}) // Если файл есть, передаём SHA для обновления
+            content: btoa(unescape(encodeURIComponent(content))),
+            ...(sha ? { sha } : {})
         };
 
-        // Отправляем запрос на сохранение
         const putRes = await fetch(apiUrl, {
             method: "PUT",
             headers: {
-                "Authorization": `token ${storedToken}`,
+                "Authorization": `token ${token}`,
                 "Content-Type": "application/json"
             },
             body: JSON.stringify(body)
