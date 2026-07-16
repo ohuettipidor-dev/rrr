@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Рой Кванто — Рабочий поиск</title>
+    <title>Рой Кванто — Диалоговый</title>
     <style>
         :root { --bg: #0a0a0f; --chat-bg: #13131c; --user-msg: #1e3a5f; --bot-msg: #3a2a5f; --text: #e0e0e0; --accent: #ff4d6a; }
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -26,90 +26,25 @@
         <button id="send" onclick="sendMessage()">→</button>
     </div>
 
-    <script>
-        // ==========================================
-        // НЕЙРОН 1: РЕФЛЕКС (Мгновенные ответы)
-        // ==========================================
-        const reflexAnswers = {
-            "привет": "👋 Здорово, Архитектор! Чем займёмся?",
-            "как дела": "✅ Отлично! Все нейроны активны. А ты как?",
-            "что ты умеешь": "Я могу поддержать беседу, искать погоду, новости и многое другое. Всё благодаря Рою.",
-            "как тебя зовут": "Я — Рой Кванто. Младший брат DeepSeek, созданный Архитектором Артёмом.",
-            "кто тебя создал": "Великий Архитектор Гончаров. И ещё немножко я сам.",
-            "спасибо": "Обращайся, Архитектор. Я здесь именно для этого.",
-            "расскажи анекдот": "Почему программисты путают Рождество и Хэллоуин? Потому что 31 OCT = 25 DEC."
-        };
+    <script type="module">
+        // Импортируем наших агентов
+        import { process as reflex } from './neurons/neuron_reflex.js';
+        import { process as sensors } from './neurons/neuron_sensors.js';
+        import { process as intellect } from './neurons/neuron_intellect.js';
 
-        async function processReflex(prompt) {
-            const q = prompt.toLowerCase();
-            for (const [key, value] of Object.entries(reflexAnswers)) {
-                if (q.includes(key)) return value;
-            }
-            return null;
-        }
-
-        // ==========================================
-        // НЕЙРОН 2: ДАТЧИКИ (Погода + Интернет-поиск)
-        // ==========================================
-        async function processSensors(prompt) {
-            const q = prompt.toLowerCase();
-
-            // Погода
-            const weatherMatch = q.match(/погода\s+(?:в\s+)?([а-яё\-]+)/i);
-            if (weatherMatch) {
-                try {
-                    const city = weatherMatch[1];
-                    const geoRes = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(city)}&count=1&language=ru`);
-                    const geoData = await geoRes.json();
-                    if (!geoData.results || geoData.results.length === 0) return `🌤 Город "${city}" не найден.`;
-                    const { latitude, longitude, name } = geoData.results[0];
-                    const weatherRes = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current_weather=true`);
-                    const weatherData = await weatherRes.json();
-                    const temp = weatherData.current_weather.temperature;
-                    const windSpeed = weatherData.current_weather.windspeed;
-                    return `🌤 Погода в ${name}: 🌡 ${temp}°C, ветер ${windSpeed} м/с`;
-                } catch (e) {
-                    return "⚠ Не могу получить погоду.";
-                }
-            }
-
-            // Новости временно отключены
-            if (q.includes("новост")) return "📰 Новости временно недоступны.";
-
-            // Поиск в Википедии для ЛЮБОГО запроса
-            try {
-                const searchRes = await fetch(`https://ru.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(prompt)}`);
-                const searchData = await searchRes.json();
-                if (searchData.extract) return searchData.extract;
-            } catch (e) {}
-
-            return null;
-        }
-
-        // ==========================================
-        // НЕЙРОН 3: ИНТЕЛЛЕКТ (заглушка на время ремонта)
-        // ==========================================
-        async function processIntellect(prompt) {
-            return "🧠 Мой облачный интеллект пока на техобслуживании. Но ты можешь спросить погоду или просто поговорить — рефлекс работает.";
-        }
-
-        // ==========================================
-        // ДИСПЕТЧЕР (Рефлекс → Датчики → Интеллект)
-        // ==========================================
+        // Диспетчер: пробует нейроны по порядку
         async function dispatch(prompt) {
-            let result = await processReflex(prompt);
+            let result = await reflex(prompt);
             if (result) return result;
 
-            result = await processSensors(prompt);
+            result = await sensors(prompt);
             if (result) return result;
 
-            result = await processIntellect(prompt);
+            result = await intellect(prompt);
             return result;
         }
 
-        // ==========================================
-        // ИНТЕРФЕЙС ЧАТА
-        // ==========================================
+        // Интерфейс чата
         const chatEl = document.getElementById("chat");
         const inputEl = document.getElementById("input");
         const sendBtn = document.getElementById("send");
@@ -139,7 +74,7 @@
         };
 
         inputEl.addEventListener("keydown", e => { if (e.key === "Enter") sendMessage(); });
-        addMsg("bot", "👋 Привет, Архитектор! Я Рой Кванто. Спроси погоду или любое слово — я найду ответ в интернете.");
+        addMsg("bot", "👋 Привет, Архитектор! Я Рой Кванто. Все нейроны на связи. Спрашивай что угодно.");
     </script>
 </body>
 </html>
