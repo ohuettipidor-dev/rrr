@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Рой Кванто — GitHub Edition</title>
+    <style>
+        :root {
+            --bg: #0a0a0f;
+            --chat-bg: #13131c;
+            --user-msg: #1e3a5f;
+            --bot-msg: #3a2a5f;
+            --text: #e0e0e0;
+            --accent: #ff4d6a;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            padding: 8px;
+        }
+        #chat {
+            flex: 1;
+            overflow-y: auto;
+            background: var(--chat-bg);
+            border-radius: 16px;
+            padding: 16px;
+            margin-bottom: 8px;
+        }
+        .msg { margin-bottom: 14px; display: flex; flex-direction: column; }
+        .user { align-items: flex-end; }
+        .bot  { align-items: flex-start; }
+        .bubble {
+            max-width: 85%;
+            padding: 10px 14px;
+            border-radius: 16px;
+            word-break: break-word;
+            line-height: 1.4;
+            white-space: pre-wrap;
+        }
+        .user .bubble { background: var(--user-msg); }
+        .bot  .bubble { background: var(--bot-msg); }
+        #input-area { display: flex; gap: 8px; }
+        #input {
+            flex: 1;
+            padding: 12px;
+            border-radius: 24px;
+            border: none;
+            background: #1a1a2a;
+            color: #fff;
+            font-size: 16px;
+        }
+        #send {
+            background: var(--accent);
+            border: none;
+            border-radius: 50%;
+            width: 48px;
+            height: 48px;
+            color: #fff;
+            font-size: 20px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <div id="chat"></div>
+    <div id="input-area">
+        <input id="input" type="text" placeholder="Спроси что угодно..." autofocus>
+        <button id="send" onclick="sendMessage()">→</button>
+    </div>
+
+    <script type="module">
+        import { dispatch } from './neurons/dispatcher.js';
+        
+        const chatEl = document.getElementById("chat");
+        const inputEl = document.getElementById("input");
+        const sendBtn = document.getElementById("send");
+
+        function addMsg(role, text) {
+            const div = document.createElement("div");
+            div.className = `msg ${role}`;
+            div.innerHTML = `<div class="bubble">${text.replace(/\n/g, "<br>")}</div>`;
+            chatEl.appendChild(div);
+            chatEl.scrollTop = chatEl.scrollHeight;
+        }
+
+        window.sendMessage = async () => {
+            const text = inputEl.value.trim();
+            if (!text) return;
+            addMsg("user", text);
+            inputEl.value = "";
+            inputEl.disabled = sendBtn.disabled = true;
+            addMsg("bot", "Думаю...");
+            const answer = await dispatch(text);
+            chatEl.lastChild.remove();
+            addMsg("bot", answer);
+            inputEl.disabled = sendBtn.disabled = false;
+            inputEl.focus();
+        };
+
+        inputEl.addEventListener("keydown", e => { if (e.key === "Enter") sendMessage(); });
+        addMsg("bot", "👋 Привет, Архитектор! Я Рой Кванто. Все нейроны активны. Спрашивай!");
+    </script>
+</body>
+</html>
