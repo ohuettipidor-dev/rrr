@@ -17,9 +17,8 @@ export async function process(prompt) {
         const reason = q.replace('!плохо', '').trim() || 'не указана';
         reportCard.push({ type: 'bad', reason, time: new Date().toISOString() });
 
-        // Пытаемся исправить проблему
-        if (reason.includes('контекст') || reason.includes('завис')) {
-            // Проблема с Интеллектом. Пытаемся обновить его код.
+        // ВСЕГДА пытаемся исправить проблему с Интеллектом, если она связана с зависанием или контекстом
+        if (reason.includes('завис') || reason.includes('контекст') || reason.includes('перегружен')) {
             const newCode = `// Нейрон 3: Интеллект (Диалоговый агент с памятью контекста)
 const conversationHistory = [];
 
@@ -68,6 +67,7 @@ export async function process(prompt) {
         return "⚠ Облачный разум временно перегружен.";
     }
 }`;
+            // Вызываем Писаря для сохранения исправленного файла
             const result = await writeFile('neurons/neuron_intellect.js', newCode, '🛠 Авто-фикс: улучшен контекст');
             return `📝 Записал проблему: "${reason}".\n🔧 Попытался исправить: ${result}`;
         }
