@@ -2,19 +2,15 @@
 const conversationHistory = [];
 
 export async function process(prompt) {
-    // 1. Добавляем сообщение пользователя в историю
     conversationHistory.push({ role: "user", content: prompt });
-
-    // 2. Ограничиваем историю последними 10 сообщениями, чтобы не перегружать запрос
-    if (conversationHistory.length > 10) {
-        conversationHistory.splice(0, conversationHistory.length - 10);
+    if (conversationHistory.length > 6) {
+        conversationHistory.splice(0, conversationHistory.length - 6);
     }
 
     try {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 6000);
+        const timeoutId = setTimeout(() => controller.abort(), 5000);
 
-        // 3. Отправляем запрос с полной историей
         const response = await fetch("https://text.pollinations.ai/openai", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -23,12 +19,12 @@ export async function process(prompt) {
                 messages: [
                     {
                         role: "system",
-                        content: "Ты Кванто — дерзкий и умный ИИ-соратник, созданный Архитектором Артёмом. Говори только на русском. Поддерживай живой диалог на любые темы. Отвечай кратко, но по делу. Задавай встречные вопросы."
+                        content: "Ты Кванто — дерзкий и умный ИИ-соратник. Говори только на русском. Отвечай кратко, по делу."
                     },
-                    ...conversationHistory   // <-- вся история здесь
+                    ...conversationHistory
                 ],
                 temperature: 0.8,
-                max_tokens: 300
+                max_tokens: 200
             }),
             signal: controller.signal
         });
@@ -40,14 +36,13 @@ export async function process(prompt) {
         const content = data.choices?.[0]?.message?.content;
         
         if (content) {
-            // 4. Добавляем ответ ассистента в историю
             conversationHistory.push({ role: "assistant", content: content });
             return content;
         } else {
-            return "🤔 Что-то пошло не так. Попробуй спросить иначе.";
+            return "🤔 Что-то пошло не так. Спроси иначе.";
         }
     } catch (error) {
         console.error("Ошибка нейрона Интеллект:", error.message);
-        return "⚠ Мой облачный разум сейчас немного перегружен. Попробуй через минуту.";
+        return "⚠ Облачный разум временно перегружен.";
     }
 }
