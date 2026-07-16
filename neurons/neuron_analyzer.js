@@ -1,11 +1,10 @@
 // Нейрон: Анализатор (Автоматический страж)
-// Он следит за появлением ошибок в чате и запускает Писаря для их исправления.
+// Сам видит ошибки Интеллекта и чинит их, отчитываясь в чат.
 import { writeFile } from './neuron_github.js';
 
-let lastErrorFixed = null; // Время последней авто-починки
-let tokenRequested = false; // Запрашивали ли мы уже токен
+let lastErrorFixed = null;
 
-// Функция для добавления сообщения в чат
+// Функция для вывода сообщения в чат
 function addMsgToChat(role, text) {
     const chatEl = document.getElementById("chat");
     if (!chatEl) return;
@@ -16,9 +15,7 @@ function addMsgToChat(role, text) {
     chatEl.scrollTop = chatEl.scrollHeight;
 }
 
-export async function process(prompt) {
-    return null;
-}
+export async function process(prompt) { return null; }
 
 export function startAnalyzer() {
     console.log("🔍 Анализатор активирован. Ожидаю ошибки...");
@@ -30,8 +27,7 @@ export function startAnalyzer() {
             if (text.includes('⚠ Облачный разум временно перегружен')) {
                 const now = Date.now();
                 if (lastErrorFixed && (now - lastErrorFixed < 60000)) {
-                    console.log("⏳ Анализатор: недавно уже чинили. Жду.");
-                    return;
+                    return; // Только что уже чинили, ждём
                 }
                 console.log("🚨 Анализатор: обнаружена ошибка Интеллекта. Запускаю исправление...");
                 lastErrorFixed = now;
@@ -104,7 +100,7 @@ export async function process(prompt) {
     return "🤔 Все каналы связи перегружены. Попробуй позже.";
 }`;
 
-                // Вызываем Писаря
+                // Вызываем Писаря для автоматического исправления
                 const result = await writeFile(
                     'neurons/neuron_intellect.js',
                     newIntellectCode,
@@ -112,8 +108,7 @@ export async function process(prompt) {
                 );
 
                 // Показываем результат в чате
-                addMsgToChat('bot', `🛠 Анализатор: обнаружена ошибка. Автоматическое исправление:\n${result}`);
-                console.log("🛠 Анализатор: " + result);
+                addMsgToChat('bot', `🛠 Авто-фикс Анализатора:\n${result}`);
             }
         }
     }, 10000);
