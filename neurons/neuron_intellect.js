@@ -1,4 +1,4 @@
-// Нейрон 3: Интеллект (Диалоговый агент с памятью контекста)
+// Нейрон 3: Интеллект (с резервным API)
 const conversationHistory = [];
 
 export async function process(prompt) {
@@ -7,42 +7,61 @@ export async function process(prompt) {
         conversationHistory.splice(0, conversationHistory.length - 6);
     }
 
-    try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 5000);
-
-        const response = await fetch("https://text.pollinations.ai/openai", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-                model: "gpt-4o-mini",
-                messages: [
-                    {
-                        role: "system",
-                        content: "Ты Кванто — дерзкий и умный ИИ-соратник. Говори только на русском. Отвечай кратко, по делу."
-                    },
-                    ...conversationHistory
-                ],
-                temperature: 0.8,
-                max_tokens: 200
-            }),
-            signal: controller.signal
-        });
-        clearTimeout(timeoutId);
-
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-
-        const data = await response.json();
-        const content = data.choices?.[0]?.message?.content;
-        
-        if (content) {
-            conversationHistory.push({ role: "assistant", content: content });
-            return content;
-        } else {
-            return "🤔 Что-то пошло не так. Спроси иначе.";
+    // Пул API (основной и резервный)
+    const apiPool = [
+        {
+            name: "Pollinations",
+            url: "https://text.pollinations.ai/openai",
+            model: "gpt-4o-mini",
+            key: null
+        },
+        {
+            name: "OpenRouter",
+            url: "https://openrouter.ai/api/v1/chat/completions",
+            model: "gryphe/mythomax-l2-13b",
+            key: "sk-or-v1-9c6f7e8d5a4b3c2d1e0f9a8b7c6d5e4a3b2c1d0e"
         }
-    } catch (error) {
-        console.error("Ошибка нейрона Интеллект:", error.message);
-        return "⚠ Облачный разум временно перегружен.";
+    ];
+
+    for (const api of apiPool) {
+        try {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 7000);
+
+            const headers = { "Content-Type": "application/json" };
+            if (api.key) {
+                headers["Authorization"] = `Bearer ${api.key}`;
+            }
+
+            const response = await fetch(api.url, {
+                method: "POST",
+                headers: headers,
+                body: JSON.stringify({
+                    model: api.model,
+                    messages: [
+                        { role: "system", content: "Ты Кванто — дерзкий и умный ИИ-соратник. Говори только на русском. Отвечай кратко, по делу." },
+                        ...conversationHistory
+                    ],
+                    temperature: 0.8,
+                    max_tokens: 200
+                }),
+                signal: controller.signal
+            });
+            clearTimeout(timeoutId);
+
+            if (!response.ok) continue;
+
+            const data = await response.json();
+            const content = data.choices?.[0]?.message?.content;
+            if (content) {
+                conversationHistory.push({ role: "assistant", content: content });
+                return content;
+            }
+        } catch (error) {
+            console.warn(`API ${api.name} не ответил:`, error.message);
+            continue;
+        }
     }
+
+    return "🤔 Все каналы связи перегружены. Попробуй позже.";
 }
