@@ -1,83 +1,47 @@
-// Нейрон 0: Наставник + Непрерывный Авто-фикс
+// Нейрон 0: Наставник — Автономный инженер с динамическим кодом
 import { writeFile } from './neuron_github.js';
-import { process as intellect } from './neuron_intellect.js';
 
 const reportCard = [];
 
-// Несколько запасных версий Интеллекта, которые будет пробовать Наставник
-const FIX_STRATEGIES = [
-    {
-        name: "Основной API + короткий таймаут",
-        code: `// Интеллект (Основной API)
-const conversationHistory = [];
-export async function process(prompt) {
-    conversationHistory.push({ role: "user", content: prompt });
-    if (conversationHistory.length > 6) conversationHistory.splice(0, conversationHistory.length - 6);
+// Генерирует новый код для исправления ошибки, используя облачный ИИ
+async function generateFix(errorDescription) {
+    const prompt = `Ты — эксперт по JavaScript. Пользователь сообщил об ошибке в системе: "${errorDescription}".
+Система использует API Pollinations (https://text.pollinations.ai/openai) для диалогов.
+Предложи исправление кода для файла neurons/neuron_intellect.js.
+Учти, что проблема может быть в таймауте, формате ответа, контексте или недоступности API.
+Верни ТОЛЬКО полный код файла, без пояснений.`;
+    
     try {
-        const c = new AbortController();
-        const t = setTimeout(() => c.abort(), 5000);
-        const r = await fetch("https://text.pollinations.ai/openai", { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({ model:"gpt-4o-mini", messages:[{role:"system",content:"Ты Кванто. Говори на русском. Отвечай кратко."}, ...conversationHistory], temperature:0.8, max_tokens:200 }), signal:c.signal });
-        clearTimeout(t);
-        if (!r.ok) throw new Error("HTTP "+r.status);
-        const d = await r.json();
-        const txt = d.choices?.[0]?.message?.content;
-        if (txt) { conversationHistory.push({ role:"assistant", content:txt }); return txt; }
-        return "🤔 Спроси иначе.";
-    } catch(e) { return "⚠ Облачный разум временно перегружен."; }
-}`
-    },
-    {
-        name: "Основной API + длинный таймаут",
-        code: `// Интеллект (Основной API, таймаут 12с)
-const conversationHistory = [];
-export async function process(prompt) {
-    conversationHistory.push({ role: "user", content: prompt });
-    if (conversationHistory.length > 6) conversationHistory.splice(0, conversationHistory.length - 6);
-    try {
-        const c = new AbortController();
-        const t = setTimeout(() => c.abort(), 12000);
-        const r = await fetch("https://text.pollinations.ai/openai", { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({ model:"gpt-4o-mini", messages:[{role:"system",content:"Ты Кванто. Говори на русском. Отвечай кратко."}, ...conversationHistory], temperature:0.8, max_tokens:200 }), signal:c.signal });
-        clearTimeout(t);
-        if (!r.ok) throw new Error("HTTP "+r.status);
-        const d = await r.json();
-        const txt = d.choices?.[0]?.message?.content;
-        if (txt) { conversationHistory.push({ role:"assistant", content:txt }); return txt; }
-        return "🤔 Спроси иначе.";
-    } catch(e) { return "⚠ Облачный разум временно перегружен."; }
-}`
-    },
-    {
-        name: "Резервный API OpenRouter",
-        code: `// Интеллект (Резервный API OpenRouter)
-const conversationHistory = [];
-export async function process(prompt) {
-    conversationHistory.push({ role: "user", content: prompt });
-    if (conversationHistory.length > 6) conversationHistory.splice(0, conversationHistory.length - 6);
-    try {
-        const c = new AbortController();
-        const t = setTimeout(() => c.abort(), 7000);
-        const r = await fetch("https://openrouter.ai/api/v1/chat/completions", { method:"POST", headers:{"Content-Type":"application/json","Authorization":"Bearer sk-or-v1-9c6f7e8d5a4b3c2d1e0f9a8b7c6d5e4a3b2c1d0e"}, body:JSON.stringify({ model:"gryphe/mythomax-l2-13b", messages:[{role:"system",content:"Ты Кванто. Говори на русском. Отвечай кратко."}, ...conversationHistory], temperature:0.8, max_tokens:200 }), signal:c.signal });
-        clearTimeout(t);
-        if (!r.ok) throw new Error("HTTP "+r.status);
-        const d = await r.json();
-        const txt = d.choices?.[0]?.message?.content;
-        if (txt) { conversationHistory.push({ role:"assistant", content:txt }); return txt; }
-        return "🤔 Спроси иначе.";
-    } catch(e) { return "⚠ Облачный разум временно перегружен."; }
-}`
+        const response = await fetch("https://text.pollinations.ai/openai", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                model: "gpt-4o-mini",
+                messages: [{ role: "user", content: prompt }],
+                temperature: 0.5,
+                max_tokens: 500
+            })
+        });
+        if (!response.ok) return null;
+        const data = await response.json();
+        return data.choices?.[0]?.message?.content || null;
+    } catch {
+        return null;
     }
-];
+}
 
-let currentStrategyIndex = 0;
-
-async function runStressTest() {
+// Стресс-тест после исправления
+async function runStressTest(intellectModule) {
     const testPrompts = ["Привет", "Как дела?", "Что нового?"];
-    const results = [];
     for (const p of testPrompts) {
-        const answer = await intellect(p);
-        results.push(answer);
+        try {
+            const answer = await intellectModule.process(p);
+            if (answer.includes('⚠ Облачный разум временно перегружен')) return false;
+        } catch {
+            return false;
+        }
     }
-    return results.every(r => !r.includes('⚠ Облачный разум временно перегружен'));
+    return true;
 }
 
 export async function process(prompt) {
@@ -85,59 +49,65 @@ export async function process(prompt) {
 
     if (q.startsWith('!хорошо')) {
         reportCard.push({ type: 'good', time: new Date().toISOString() });
-        return "✅ Понял. Это рабочий подход, запомню.";
+        return "✅ Запомнил.";
     }
 
     if (q.startsWith('!плохо')) {
         const reason = q.replace('!плохо', '').trim() || 'не указана';
         reportCard.push({ type: 'bad', reason, time: new Date().toISOString() });
 
-        // --- НЕПРЕРЫВНЫЙ ЦИКЛ ИСПРАВЛЕНИЯ ---
-        let finalReport = `📝 Проблема: "${reason}".\n🔄 Запускаю непрерывный авто-фикс...\n`;
+        let report = `📝 Проблема: "${reason}".\n🔄 Запускаю авто-фикс (динамический)...\n`;
         let success = false;
-        const maxAttempts = FIX_STRATEGIES.length;
+        const maxAttempts = 5;
 
-        for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-            const strategy = FIX_STRATEGIES[currentStrategyIndex];
-            finalReport += `\n🔧 Попытка ${attempt}/${maxAttempts}: ${strategy.name}...`;
+        for (let i = 1; i <= maxAttempts; i++) {
+            report += `\n🔧 Попытка ${i}/${maxAttempts}: генерирую исправление...`;
             
-            // Применяем стратегию
-            const writeResult = await writeFile('neurons/neuron_intellect.js', strategy.code, `🛠 Авто-фикс: ${strategy.name}`);
-            finalReport += `\n   ${writeResult}`;
-            
-            // Ждём, пока GitHub обновит файл
+            const newCode = await generateFix(reason);
+            if (!newCode) {
+                report += `\n❌ Не удалось сгенерировать код.`;
+                continue;
+            }
+
+            const writeResult = await writeFile('neurons/neuron_intellect.js', newCode, `🛠 Авто-фикс (попытка ${i})`);
+            report += `\n   ${writeResult}`;
+
+            if (!writeResult.includes('✅')) {
+                report += `\n❌ Ошибка записи, останавливаюсь.`;
+                break;
+            }
+
+            // Ждём обновления GitHub Pages (около 2 секунд)
             await new Promise(r => setTimeout(r, 2000));
-            
-            // Тестируем
-            finalReport += `\n   🧪 Стресс-тест...`;
-            success = await runStressTest();
-            
+
+            // Динамически импортируем обновлённый модуль
+            try {
+                const updatedModule = await import(`./neuron_intellect.js?update=${Date.now()}`);
+                success = await runStressTest(updatedModule);
+            } catch {
+                success = false;
+            }
+
             if (success) {
-                finalReport += `\n✅ Контролёр: стресс-тест пройден! Стратегия "${strategy.name}" работает.`;
+                report += `\n✅ Контролёр: стресс-тест пройден! Система восстановлена.`;
                 break;
             } else {
-                finalReport += `\n❌ Контролёр: тест не пройден. Пробую следующую стратегию...`;
-                currentStrategyIndex = (currentStrategyIndex + 1) % FIX_STRATEGIES.length;
+                report += `\n❌ Контролёр: тест не пройден. Пробую снова...`;
             }
         }
 
         if (!success) {
-            finalReport += `\n🚨 Все стратегии испробованы. Требуется ручное вмешательство.`;
-        } else {
-            // Сбрасываем индекс на успешную стратегию для будущих фиксов
-            // currentStrategyIndex уже указывает на следующую, но мы вернём на успешную
-            currentStrategyIndex = (currentStrategyIndex - 1 + FIX_STRATEGIES.length) % FIX_STRATEGIES.length;
+            report += `\n🚨 Авто-фикс не смог исправить ошибку за ${maxAttempts} попыток. Требуется ручное вмешательство.`;
         }
 
-        return finalReport;
+        return report;
     }
 
     if (q.includes('статистика') || q.includes('отчёт')) {
-        if (reportCard.length === 0) return "📊 Нет данных.";
         const good = reportCard.filter(e => e.type === 'good').length;
         const bad = reportCard.filter(e => e.type === 'bad').length;
         return `📊 Статистика:\n✅ Хороших: ${good}\n❌ Плохих: ${bad}`;
     }
 
     return null;
-}
+                }
