@@ -1,4 +1,4 @@
-// Нейрон 0: Наставник (Аналитик + Исполнитель)
+// Нейрон 0: Наставник (Ручной Авто-фикс)
 import { writeFile } from './neuron_github.js';
 
 const reportCard = [];
@@ -6,20 +6,18 @@ const reportCard = [];
 export async function process(prompt) {
     const q = prompt.trim();
 
-    // --- 1. Оценка "!хорошо" ---
     if (q.startsWith('!хорошо')) {
         reportCard.push({ type: 'good', time: new Date().toISOString() });
-        return "✅ Понял, Архитектор. Это рабочий подход, запомню.";
+        return "✅ Понял. Это рабочий подход, запомню.";
     }
 
-    // --- 2. Оценка "!плохо [причина]" ---
     if (q.startsWith('!плохо')) {
         const reason = q.replace('!плохо', '').trim() || 'не указана';
         reportCard.push({ type: 'bad', reason, time: new Date().toISOString() });
 
-        // ВСЕГДА пытаемся исправить проблему с Интеллектом, если она связана с зависанием или контекстом
-        if (reason.includes('завис') || reason.includes('контекст') || reason.includes('перегружен')) {
-            const newCode = `// Нейрон 3: Интеллект (Диалоговый агент с памятью контекста)
+        // Всегда пытаемся исправить Интеллект, если команда связана с его ошибкой
+        if (reason.includes('завис') || reason.includes('контекст') || reason.includes('перегружен') || reason.includes('облачный')) {
+            const newIntellectCode = `// Нейрон 3: Интеллект (Быстрый проверенный канал с контекстом)
 const conversationHistory = [];
 
 export async function process(prompt) {
@@ -38,10 +36,7 @@ export async function process(prompt) {
             body: JSON.stringify({
                 model: "gpt-4o-mini",
                 messages: [
-                    {
-                        role: "system",
-                        content: "Ты Кванто — дерзкий и умный ИИ-соратник. Говори только на русском. Отвечай кратко, по делу."
-                    },
+                    { role: "system", content: "Ты Кванто — дерзкий и умный ИИ-соратник. Говори только на русском. Отвечай кратко, по делу." },
                     ...conversationHistory
                 ],
                 temperature: 0.8,
@@ -67,22 +62,18 @@ export async function process(prompt) {
         return "⚠ Облачный разум временно перегружен.";
     }
 }`;
-            // Вызываем Писаря для сохранения исправленного файла
-            const result = await writeFile('neurons/neuron_intellect.js', newCode, '🛠 Авто-фикс: улучшен контекст');
+            const result = await writeFile('neurons/neuron_intellect.js', newIntellectCode, '🛠 Авто-фикс Наставника');
             return `📝 Записал проблему: "${reason}".\n🔧 Попытался исправить: ${result}`;
         }
 
         return `📝 Записал проблему: "${reason}". Буду искать альтернативу.`;
     }
 
-    // --- 3. Статистика ---
     if (q.includes('статистика') || q.includes('отчёт')) {
-        if (reportCard.length === 0) {
-            return "📊 Пока нет данных для отчёта. Оцени мои ответы командами `!хорошо` или `!плохо`.";
-        }
+        if (reportCard.length === 0) return "📊 Пока нет данных для отчёта.";
         const good = reportCard.filter(e => e.type === 'good').length;
         const bad = reportCard.filter(e => e.type === 'bad').length;
-        return `📊 Статистика за сессию:\n✅ Хороших ответов: ${good}\n❌ Плохих ответов: ${bad}`;
+        return `📊 Статистика:\n✅ Хороших: ${good}\n❌ Плохих: ${bad}`;
     }
 
     return null;
