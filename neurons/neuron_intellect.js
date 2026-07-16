@@ -1,11 +1,11 @@
-// Нейрон 3: Интеллект (Быстрый облачный диалоговый агент с памятью контекста)
+// Нейрон 3: Интеллект (Диалоговый агент с памятью контекста)
 const conversationHistory = [];
 
 export async function process(prompt) {
-    // Добавляем сообщение пользователя в историю
+    // 1. Добавляем сообщение пользователя в историю
     conversationHistory.push({ role: "user", content: prompt });
 
-    // Ограничиваем историю последними 10 сообщениями
+    // 2. Ограничиваем историю последними 10 сообщениями, чтобы не перегружать запрос
     if (conversationHistory.length > 10) {
         conversationHistory.splice(0, conversationHistory.length - 10);
     }
@@ -14,6 +14,7 @@ export async function process(prompt) {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 6000);
 
+        // 3. Отправляем запрос с полной историей
         const response = await fetch("https://text.pollinations.ai/openai", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -24,7 +25,7 @@ export async function process(prompt) {
                         role: "system",
                         content: "Ты Кванто — дерзкий и умный ИИ-соратник, созданный Архитектором Артёмом. Говори только на русском. Поддерживай живой диалог на любые темы. Отвечай кратко, но по делу. Задавай встречные вопросы."
                     },
-                    ...conversationHistory
+                    ...conversationHistory   // <-- вся история здесь
                 ],
                 temperature: 0.8,
                 max_tokens: 300
@@ -39,7 +40,7 @@ export async function process(prompt) {
         const content = data.choices?.[0]?.message?.content;
         
         if (content) {
-            // Добавляем ответ ассистента в историю
+            // 4. Добавляем ответ ассистента в историю
             conversationHistory.push({ role: "assistant", content: content });
             return content;
         } else {
