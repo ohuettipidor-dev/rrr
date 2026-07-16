@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Рой Кванто — Автономный</title>
+    <title>Рой Кванто — Ручной Авто-фикс</title>
     <style>
         :root { --bg: #0a0a0f; --chat-bg: #13131c; --user-msg: #1e3a5f; --bot-msg: #3a2a5f; --text: #e0e0e0; --accent: #ff4d6a; }
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -22,42 +22,30 @@
 <body>
     <div id="chat"></div>
     <div id="input-area">
-        <input id="input" type="text" placeholder="Спроси или оцени работу..." autofocus>
+        <input id="input" type="text" placeholder="Спроси или !плохо..." autofocus>
         <button id="send" onclick="sendMessage()">→</button>
     </div>
 
     <script type="module">
-        // Импортируем нейроны
         import { process as mentor } from './neurons/neuron_mentor.js';
         import { process as reflex } from './neurons/neuron_reflex.js';
         import { process as sensors } from './neurons/neuron_sensors.js';
         import { process as intellect } from './neurons/neuron_intellect.js';
-        import { startAnalyzer } from './neurons/neuron_analyzer.js';
 
-        // ==========================================
-        // ДИСПЕТЧЕР (Наставник → Рефлекс → Датчики → Интеллект)
-        // ==========================================
         async function dispatch(prompt) {
-            // 1. Наставник — перехватывает команды !плохо / !хорошо / статистика
             let result = await mentor(prompt);
             if (result) return result;
 
-            // 2. Рефлекс — мгновенные ответы на простые слова
             result = await reflex(prompt);
             if (result) return result;
 
-            // 3. Датчики — погода, поиск в интернете
             result = await sensors(prompt);
             if (result) return result;
 
-            // 4. Интеллект — облачный диалоговый агент (с резервным API)
             result = await intellect(prompt);
             return result;
         }
 
-        // ==========================================
-        // ИНТЕРФЕЙС ЧАТА
-        // ==========================================
         const chatEl = document.getElementById("chat");
         const inputEl = document.getElementById("input");
         const sendBtn = document.getElementById("send");
@@ -87,11 +75,8 @@
         };
 
         inputEl.addEventListener("keydown", e => { if (e.key === "Enter") sendMessage(); });
-        
-        // Запускаем Анализатор (фоновый страж)
-        startAnalyzer();
 
-        addMsg("bot", "👋 Привет, Архитектор! Наставник и Анализатор на связи. Спрашивай что угодно.");
+        addMsg("bot", "👋 Привет, Архитектор! Я снова управляюсь вручную. Пиши !плохо, если зависну.");
     </script>
 </body>
 </html>
