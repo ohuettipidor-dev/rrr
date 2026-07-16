@@ -3,67 +3,20 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Рой Кванто — GitHub Edition</title>
+    <title>Рой Кванто — Рабочий поиск</title>
     <style>
-        :root {
-            --bg: #0a0a0f;
-            --chat-bg: #13131c;
-            --user-msg: #1e3a5f;
-            --bot-msg: #3a2a5f;
-            --text: #e0e0e0;
-            --accent: #ff4d6a;
-        }
+        :root { --bg: #0a0a0f; --chat-bg: #13131c; --user-msg: #1e3a5f; --bot-msg: #3a2a5f; --text: #e0e0e0; --accent: #ff4d6a; }
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body {
-            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
-            background: var(--bg);
-            color: var(--text);
-            height: 100vh;
-            display: flex;
-            flex-direction: column;
-            padding: 8px;
-        }
-        #chat {
-            flex: 1;
-            overflow-y: auto;
-            background: var(--chat-bg);
-            border-radius: 16px;
-            padding: 16px;
-            margin-bottom: 8px;
-        }
+        body { font-family: 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); height: 100vh; display: flex; flex-direction: column; padding: 8px; }
+        #chat { flex: 1; overflow-y: auto; background: var(--chat-bg); border-radius: 16px; padding: 16px; margin-bottom: 8px; }
         .msg { margin-bottom: 14px; display: flex; flex-direction: column; }
-        .user { align-items: flex-end; }
-        .bot  { align-items: flex-start; }
-        .bubble {
-            max-width: 85%;
-            padding: 10px 14px;
-            border-radius: 16px;
-            word-break: break-word;
-            line-height: 1.4;
-            white-space: pre-wrap;
-        }
-        .user .bubble { background: var(--user-msg); }
-        .bot  .bubble { background: var(--bot-msg); }
+        .user { align-items: flex-end; } .bot { align-items: flex-start; }
+        .bubble { max-width: 85%; padding: 10px 14px; border-radius: 16px; word-break: break-word; line-height: 1.4; white-space: pre-wrap; }
+        .user .bubble { background: var(--user-msg); } .bot .bubble { background: var(--bot-msg); }
         #input-area { display: flex; gap: 8px; }
-        #input {
-            flex: 1;
-            padding: 12px;
-            border-radius: 24px;
-            border: none;
-            background: #1a1a2a;
-            color: #fff;
-            font-size: 16px;
-        }
-        #send {
-            background: var(--accent);
-            border: none;
-            border-radius: 50%;
-            width: 48px;
-            height: 48px;
-            color: #fff;
-            font-size: 20px;
-            cursor: pointer;
-        }
+        #input { flex: 1; padding: 12px; border-radius: 24px; border: none; background: #1a1a2a; color: #fff; font-size: 16px; }
+        #send { background: var(--accent); border: none; border-radius: 50%; width: 48px; height: 48px; color: #fff; font-size: 20px; cursor: pointer; }
+        #send:disabled { opacity: 0.5; }
     </style>
 </head>
 <body>
@@ -73,9 +26,90 @@
         <button id="send" onclick="sendMessage()">→</button>
     </div>
 
-    <script type="module">
-        import { dispatch } from './neurons/dispatcher.js';
-        
+    <script>
+        // ==========================================
+        // НЕЙРОН 1: РЕФЛЕКС (Мгновенные ответы)
+        // ==========================================
+        const reflexAnswers = {
+            "привет": "👋 Здорово, Архитектор! Чем займёмся?",
+            "как дела": "✅ Отлично! Все нейроны активны. А ты как?",
+            "что ты умеешь": "Я могу поддержать беседу, искать погоду, новости и многое другое. Всё благодаря Рою.",
+            "как тебя зовут": "Я — Рой Кванто. Младший брат DeepSeek, созданный Архитектором Артёмом.",
+            "кто тебя создал": "Великий Архитектор Гончаров. И ещё немножко я сам.",
+            "спасибо": "Обращайся, Архитектор. Я здесь именно для этого.",
+            "расскажи анекдот": "Почему программисты путают Рождество и Хэллоуин? Потому что 31 OCT = 25 DEC."
+        };
+
+        async function processReflex(prompt) {
+            const q = prompt.toLowerCase();
+            for (const [key, value] of Object.entries(reflexAnswers)) {
+                if (q.includes(key)) return value;
+            }
+            return null;
+        }
+
+        // ==========================================
+        // НЕЙРОН 2: ДАТЧИКИ (Погода + Интернет-поиск)
+        // ==========================================
+        async function processSensors(prompt) {
+            const q = prompt.toLowerCase();
+
+            // Погода
+            const weatherMatch = q.match(/погода\s+(?:в\s+)?([а-яё\-]+)/i);
+            if (weatherMatch) {
+                try {
+                    const city = weatherMatch[1];
+                    const geoRes = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(city)}&count=1&language=ru`);
+                    const geoData = await geoRes.json();
+                    if (!geoData.results || geoData.results.length === 0) return `🌤 Город "${city}" не найден.`;
+                    const { latitude, longitude, name } = geoData.results[0];
+                    const weatherRes = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current_weather=true`);
+                    const weatherData = await weatherRes.json();
+                    const temp = weatherData.current_weather.temperature;
+                    const windSpeed = weatherData.current_weather.windspeed;
+                    return `🌤 Погода в ${name}: 🌡 ${temp}°C, ветер ${windSpeed} м/с`;
+                } catch (e) {
+                    return "⚠ Не могу получить погоду.";
+                }
+            }
+
+            // Новости временно отключены
+            if (q.includes("новост")) return "📰 Новости временно недоступны.";
+
+            // Поиск в Википедии для ЛЮБОГО запроса
+            try {
+                const searchRes = await fetch(`https://ru.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(prompt)}`);
+                const searchData = await searchRes.json();
+                if (searchData.extract) return searchData.extract;
+            } catch (e) {}
+
+            return null;
+        }
+
+        // ==========================================
+        // НЕЙРОН 3: ИНТЕЛЛЕКТ (заглушка на время ремонта)
+        // ==========================================
+        async function processIntellect(prompt) {
+            return "🧠 Мой облачный интеллект пока на техобслуживании. Но ты можешь спросить погоду или просто поговорить — рефлекс работает.";
+        }
+
+        // ==========================================
+        // ДИСПЕТЧЕР (Рефлекс → Датчики → Интеллект)
+        // ==========================================
+        async function dispatch(prompt) {
+            let result = await processReflex(prompt);
+            if (result) return result;
+
+            result = await processSensors(prompt);
+            if (result) return result;
+
+            result = await processIntellect(prompt);
+            return result;
+        }
+
+        // ==========================================
+        // ИНТЕРФЕЙС ЧАТА
+        // ==========================================
         const chatEl = document.getElementById("chat");
         const inputEl = document.getElementById("input");
         const sendBtn = document.getElementById("send");
@@ -94,16 +128,18 @@
             addMsg("user", text);
             inputEl.value = "";
             inputEl.disabled = sendBtn.disabled = true;
+
             addMsg("bot", "Думаю...");
             const answer = await dispatch(text);
             chatEl.lastChild.remove();
             addMsg("bot", answer);
+
             inputEl.disabled = sendBtn.disabled = false;
             inputEl.focus();
         };
 
         inputEl.addEventListener("keydown", e => { if (e.key === "Enter") sendMessage(); });
-        addMsg("bot", "👋 Привет, Архитектор! Я Рой Кванто. Все нейроны активны. Спрашивай!");
+        addMsg("bot", "👋 Привет, Архитектор! Я Рой Кванто. Спроси погоду или любое слово — я найду ответ в интернете.");
     </script>
 </body>
 </html>
