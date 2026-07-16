@@ -1,5 +1,6 @@
-// Нейрон 0: Наставник (Ручной Авто-фикс)
+// Нейрон 0: Наставник + Контролёр
 import { writeFile } from './neuron_github.js';
+import { process as intellect } from './neuron_intellect.js';
 
 const reportCard = [];
 
@@ -15,9 +16,8 @@ export async function process(prompt) {
         const reason = q.replace('!плохо', '').trim() || 'не указана';
         reportCard.push({ type: 'bad', reason, time: new Date().toISOString() });
 
-        // Всегда пытаемся исправить Интеллект, если команда связана с его ошибкой
-        if (reason.includes('завис') || reason.includes('контекст') || reason.includes('перегружен') || reason.includes('облачный')) {
-            const newIntellectCode = `// Нейрон 3: Интеллект (Быстрый проверенный канал с контекстом)
+        // Исправляем Интеллект
+        const newIntellectCode = `// Нейрон 3: Интеллект (Быстрый проверенный канал с контекстом)
 const conversationHistory = [];
 
 export async function process(prompt) {
@@ -62,11 +62,30 @@ export async function process(prompt) {
         return "⚠ Облачный разум временно перегружен.";
     }
 }`;
-            const result = await writeFile('neurons/neuron_intellect.js', newIntellectCode, '🛠 Авто-фикс Наставника');
-            return `📝 Записал проблему: "${reason}".\n🔧 Попытался исправить: ${result}`;
+
+        const writeResult = await writeFile('neurons/neuron_intellect.js', newIntellectCode, '🛠 Авто-фикс Наставника');
+
+        // === ЗАПУСК КОНТРОЛЁРА ===
+        // После исправления тестируем Интеллект несколькими запросами
+        const testPrompts = ["Привет", "Как дела?", "Что нового?"];
+        const testResults = [];
+        
+        for (const testPrompt of testPrompts) {
+            const answer = await intellect(testPrompt);
+            testResults.push(`❓ ${testPrompt} → ${answer}`);
         }
 
-        return `📝 Записал проблему: "${reason}". Буду искать альтернативу.`;
+        const isGood = testResults.every(r => !r.includes('⚠ Облачный разум временно перегружен'));
+        
+        let statusReport = `📝 Записал проблему: "${reason}".\n🔧 ${writeResult}`;
+        
+        if (isGood) {
+            statusReport += `\n✅ Контролёр: исправление успешно. Стресс-тест пройден.`;
+        } else {
+            statusReport += `\n❌ Контролёр: проблема осталась. Стресс-тест не пройден.\nРезультаты:\n${testResults.join('\n')}`;
+        }
+        
+        return statusReport;
     }
 
     if (q.includes('статистика') || q.includes('отчёт')) {
@@ -77,4 +96,4 @@ export async function process(prompt) {
     }
 
     return null;
-}
+                             }
