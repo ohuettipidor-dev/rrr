@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Рой Кванто — Наставник активен</title>
+    <title>Рой Кванто — Автономный</title>
     <style>
         :root { --bg: #0a0a0f; --chat-bg: #13131c; --user-msg: #1e3a5f; --bot-msg: #3a2a5f; --text: #e0e0e0; --accent: #ff4d6a; }
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -32,12 +32,13 @@
         import { process as reflex } from './neurons/neuron_reflex.js';
         import { process as sensors } from './neurons/neuron_sensors.js';
         import { process as intellect } from './neurons/neuron_intellect.js';
+        import { startAnalyzer } from './neurons/neuron_analyzer.js';
 
         // ==========================================
         // ДИСПЕТЧЕР (Наставник → Рефлекс → Датчики → Интеллект)
         // ==========================================
         async function dispatch(prompt) {
-            // 1. Наставник — перехватывает команды и оценки
+            // 1. Наставник — перехватывает команды !плохо / !хорошо / статистика
             let result = await mentor(prompt);
             if (result) return result;
 
@@ -49,7 +50,7 @@
             result = await sensors(prompt);
             if (result) return result;
 
-            // 4. Интеллект — облачный диалоговый агент
+            // 4. Интеллект — облачный диалоговый агент (с резервным API)
             result = await intellect(prompt);
             return result;
         }
@@ -86,7 +87,11 @@
         };
 
         inputEl.addEventListener("keydown", e => { if (e.key === "Enter") sendMessage(); });
-        addMsg("bot", "👋 Привет, Архитектор! Наставник слушает. Можешь писать !хорошо или !плохо после любого ответа. Также доступны рефлекс, погода и диалог.");
+        
+        // Запускаем Анализатор (фоновый страж)
+        startAnalyzer();
+
+        addMsg("bot", "👋 Привет, Архитектор! Наставник и Анализатор на связи. Спрашивай что угодно.");
     </script>
 </body>
 </html>
