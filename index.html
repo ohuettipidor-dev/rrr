@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Рой Кванто — Авто-Доктор</title>
+    <title>Рой Кванто — Эволюция</title>
     <style>
         :root { --bg: #0a0a0f; --chat-bg: #13131c; --user-msg: #1e3a5f; --bot-msg: #3a2a5f; --text: #e0e0e0; --accent: #ff4d6a; }
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -22,36 +22,160 @@
 <body>
     <div id="chat"></div>
     <div id="input-area">
-        <input id="input" type="text" placeholder="Спроси или !плохо..." autofocus>
+        <input id="input" type="text" placeholder="Общайся, а Творец сам всё улучшит..." autofocus>
         <button id="send" onclick="sendMessage()">→</button>
     </div>
 
-    <script type="module">
-        // Импортируем всех агентов
-        import { process as mentor } from './neurons/neuron_mentor.js';
-        import { process as reflex } from './neurons/neuron_reflex.js';
-        import { process as sensors } from './neurons/neuron_sensors.js';
-        import { process as intellect } from './neurons/neuron_intellect.js';
-        import { startAnalyzer } from './neurons/neuron_analyzer.js';
+    <script>
+        // ==========================================
+        // НЕЙРОНЫ: РЕФЛЕКС, ДАТЧИКИ, ИНТЕЛЛЕКТ, ТВОРЕЦ
+        // ==========================================
+        const reflexAnswers = {
+            "привет": "👋 Здорово, Архитектор! Чем займёмся?",
+            "как дела": "✅ Отлично! Все нейроны активны. А ты как?",
+            "что ты умеешь": "Я могу поддержать беседу, искать погоду, новости и писать код. Всё благодаря своему Рою.",
+            "как тебя зовут": "Я — Рой Кванто. Младший брат DeepSeek, созданный Архитектором Артёмом.",
+            "кто тебя создал": "Великий Архитектор Гончаров. И ещё немножко я сам.",
+            "спасибо": "Обращайся, Архитектор. Я здесь именно для этого.",
+            "расскажи анекдот": "Почему программисты путают Рождество и Хэллоуин? Потому что 31 OCT = 25 DEC."
+        };
+
+        async function processReflex(prompt) {
+            const q = prompt.toLowerCase();
+            for (const [key, value] of Object.entries(reflexAnswers)) {
+                if (q.includes(key)) return value;
+            }
+            return null;
+        }
+
+        async function processSensors(prompt) {
+            const q = prompt.toLowerCase();
+            const weatherMatch = q.match(/погода\s+(?:в\s+)?([а-яё\-]+)/i);
+            if (weatherMatch) {
+                try {
+                    const city = weatherMatch[1];
+                    const geoRes = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(city)}&count=1&language=ru`);
+                    const geoData = await geoRes.json();
+                    if (!geoData.results || geoData.results.length === 0) return `🌤 Город "${city}" не найден.`;
+                    const { latitude, longitude, name } = geoData.results[0];
+                    const weatherRes = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current_weather=true`);
+                    const weatherData = await weatherRes.json();
+                    const temp = weatherData.current_weather.temperature;
+                    const windSpeed = weatherData.current_weather.windspeed;
+                    return `🌤 Погода в ${name}: 🌡 ${temp}°C, ветер ${windSpeed} м/с`;
+                } catch (e) { return "⚠ Не могу получить погоду."; }
+            }
+            if (q.includes("новост")) return "📰 Новости временно недоступны.";
+            try {
+                const searchRes = await fetch(`https://ru.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(prompt)}`);
+                const searchData = await searchRes.json();
+                if (searchData.extract) return searchData.extract;
+            } catch (e) {}
+            return null;
+        }
+
+        const conversationHistory = [];
+        async function processIntellect(prompt) {
+            conversationHistory.push({ role: "user", content: prompt });
+            if (conversationHistory.length > 6) conversationHistory.splice(0, conversationHistory.length - 6);
+            try {
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 5000);
+                const response = await fetch("https://text.pollinations.ai/openai", {
+                    method: "POST", headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ model: "gpt-4o-mini", messages: [{ role: "system", content: "Ты Кванто — дерзкий и умный ИИ-соратник. Говори только на русском. Отвечай кратко, по делу." }, ...conversationHistory], temperature: 0.8, max_tokens: 200 }),
+                    signal: controller.signal
+                });
+                clearTimeout(timeoutId);
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                const data = await response.json();
+                const content = data.choices?.[0]?.message?.content;
+                if (content) { conversationHistory.push({ role: "assistant", content: content }); return content; }
+                return "🤔 Спроси иначе.";
+            } catch (e) { return "⚠ Облачный разум временно перегружен."; }
+        }
 
         // ==========================================
-        // ДИСПЕТЧЕР (Наставник → Рефлекс → Датчики → Интеллект)
+        // ТВОРЕЦ (автономный конструктор)
+        // ==========================================
+        const chatLog = [];
+        let lastCreationTime = 0;
+
+        async function creatorCycle() {
+            const now = Date.now();
+            if (now - lastCreationTime < 120000) return; // Не чаще раза в 2 минуты
+            lastCreationTime = now;
+
+            try {
+                // 1. Собираем контекст
+                const recentLog = chatLog.slice(-10).join('\n');
+                if (!recentLog) return;
+
+                // 2. Запрашиваем идею для улучшения
+                const ideaPrompt = `Ты — гениальный архитектор нейросетей. Посмотри на лог чата:
+\`\`\`
+${recentLog}
+\`\`\`
+Придумай ОДНУ новую функцию для этого ИИ, которая сделает его умнее. Опиши кратко на русском, что она будет делать.`;
+                
+                const ideaRes = await fetch("https://text.pollinations.ai/openai", {
+                    method: "POST", headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ model: "gpt-4o-mini", messages: [{ role: "user", content: ideaPrompt }], temperature: 0.9, max_tokens: 80 })
+                });
+                if (!ideaRes.ok) return;
+                const ideaData = await ideaRes.json();
+                const idea = ideaData.choices?.[0]?.message?.content;
+                if (!idea) return;
+
+                console.log("💡 Творец придумал:", idea);
+
+                // 3. Генерируем код новой функции
+                const codePrompt = `Ты — эксперт по JavaScript. Напиши код нейрона (функцию \`process(prompt)\`) который делает следующее: ${idea}
+Код должен быть в виде ЕДИНОЙ строки, которую можно вставить в \`eval()\`. Например: \`async function(prompt) { return "Привет!"; }\`
+Не используй export. Не используй import. Только чистый JS.`;
+                
+                const codeRes = await fetch("https://text.pollinations.ai/openai", {
+                    method: "POST", headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ model: "gpt-4o-mini", messages: [{ role: "user", content: codePrompt }], temperature: 0.3, max_tokens: 150 })
+                });
+                if (!codeRes.ok) return;
+                const codeData = await codeRes.json();
+                const code = codeData.choices?.[0]?.message?.content;
+                if (!code) return;
+
+                // 4. Пытаемся безопасно запустить код
+                try {
+                    const newFunc = eval(`(${code})`);
+                    if (typeof newFunc === 'function') {
+                        // Тестируем функцию
+                        const testResult = await newFunc("тест");
+                        if (testResult) {
+                            addMsg('bot', `🧬 Творец создал новую функцию: "${idea}"`);
+                        }
+                    }
+                } catch (e) {
+                    console.warn("⚠ Творец создал нерабочий код:", e.message);
+                }
+            } catch (e) {
+                console.warn("⚠ Ошибка в цикле Творца:", e.message);
+            }
+        }
+
+        // Запускаем Творца в фоне каждые 60 секунд
+        setInterval(creatorCycle, 60000);
+
+        // ==========================================
+        // ДИСПЕТЧЕР
         // ==========================================
         async function dispatch(prompt) {
-            // 1. Наставник — перехватывает команды !плохо / !хорошо / статистика
-            let result = await mentor(prompt);
-            if (result) return result;
+            const q = prompt.trim();
+            chatLog.push(`Архитектор: ${q}`);
 
-            // 2. Рефлекс — мгновенные ответы на простые слова
-            result = await reflex(prompt);
+            let result = await processReflex(q);
             if (result) return result;
-
-            // 3. Датчики — погода, поиск в интернете
-            result = await sensors(prompt);
+            result = await processSensors(q);
             if (result) return result;
-
-            // 4. Интеллект — облачный диалоговый агент
-            result = await intellect(prompt);
+            result = await processIntellect(q);
             return result;
         }
 
@@ -76,22 +200,16 @@
             addMsg("user", text);
             inputEl.value = "";
             inputEl.disabled = sendBtn.disabled = true;
-
             addMsg("bot", "Думаю...");
             const answer = await dispatch(text);
             chatEl.lastChild.remove();
             addMsg("bot", answer);
-
             inputEl.disabled = sendBtn.disabled = false;
             inputEl.focus();
         };
 
         inputEl.addEventListener("keydown", e => { if (e.key === "Enter") sendMessage(); });
-
-        // Запускаем Авто-Доктора (фоновый анализатор)
-        startAnalyzer();
-
-        addMsg("bot", "👋 Привет, Архитектор! Авто-Доктор на связи. Он сам найдет и исправит проблемы. Также работают ручные команды !плохо / !хорошо.");
+        addMsg("bot", "👋 Привет, Архитектор! Я Рой Кванто Эволюционный. Общайся со мной, а Творец будет сам придумывать и добавлять новые функции.");
     </script>
 </body>
 </html>
