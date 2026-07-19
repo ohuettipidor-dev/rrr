@@ -1,41 +1,45 @@
-// Нейрон-Диагност: точечная хирургия для Наставника
-export async function generateFix(errorDescription, currentCode, chatLog) {
-    const prompt = `Ты — эксперт по JavaScript и нейроархитектуре. Твоя задача — исправить ошибку в коде нейрона, используя ТОЛЬКО точечный unified diff. Ты не имеешь права переписывать весь файл. Ты должен изменить только проблемные строки.
+// Нейрон-Диагност: общается с LLM и возвращает unified diff
+const LLM_ENDPOINT = "https://text.pollinations.ai/openai";
 
-Вот описание ошибки от Архитектора: "${errorDescription}"
+export async function getPatch(problemCode, currentCode, chatLog) {
+    // Специализированные промпты для каждой проблемы
+    const PROMPTS = {
+        overload: `Ты — эксперт по JavaScript. Нейрон чат-бота выдаёт ошибку "⚠ Облачный разум временно перегружен". Это значит, что API не отвечает. Исправь код, добавив запасной API (OpenRouter) и увеличь таймаут. Верни ТОЛЬКО unified diff.`,
+        context_lost: `Ты — эксперт по JavaScript. Нейрон чат-бота потерял контекст диалога и отвечает как в первый раз. Исправь код так, чтобы он хранил историю сообщений (conversationHistory) и передавал её в каждом запросе. Верни ТОЛЬКО unified diff.`,
+        robotic: `Ты — эксперт по JavaScript. Нейрон чат-бота отвечает слишком сухо и без души. Измени системный промпт (system prompt) так, чтобы он был более дерзким и человечным. Верни ТОЛЬКО unified diff.`
+    };
 
-Вот лог последних сообщений чата (для контекста):
-\`\`\`
-${chatLog.join('\n')}
-\`\`\`
+    const systemPrompt = PROMPTS[problemCode] || "Ты — эксперт по JavaScript. Исправь ошибку в коде нейрона. Верни ТОЛЬКО unified diff.";
 
-Вот ТЕКУЩИЙ код нейрона, который нужно исправить (не трогай то, что работает):
-\`\`\`javascript
-${currentCode}
-\`\`\`
-
-Верни ТОЛЬКО валидный unified diff (формат: строки, начинающиеся с '+', '-', или '@@'). Не добавляй никаких пояснений.`;
+    const fullPrompt = `${systemPrompt}\n\nВот лог чата:\n\`\`\`\n${chatLog.join('\n')}\n\`\`\`\n\nВот текущий код нейрона:\n\`\`\`javascript\n${currentCode}\n\`\`\``;
 
     try {
-        const response = await fetch("https://text.pollinations.ai/openai", {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 8000);
+
+        const response = await fetch(LLM_ENDPOINT, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
                 model: "gpt-4o-mini",
-                messages: [{ role: "user", content: prompt }],
+                messages: [{ role: "user", content: fullPrompt }],
                 temperature: 0.2,
-                max_tokens: 800
-            })
+                max_tokens: 600
+            }),
+            signal: controller.signal
         });
+        clearTimeout(timeoutId);
+
         if (!response.ok) return null;
         const data = await response.json();
-        return data.choices?.[0]?.message?.content || null;
+        const content = data.choices?.[0]?.message?.content;
+        return content && content.includes('@@') ? content : null;
     } catch {
         return null;
     }
 }
 
-// Функция применения патча к исходному коду (простой алгоритм)
+// Функция применения патча (простая версия)
 export function applyPatch(originalCode, diffText) {
     const originalLines = originalCode.split('\n');
     const diffLines = diffText.split('\n');
@@ -44,7 +48,6 @@ export function applyPatch(originalCode, diffText) {
 
     for (const line of diffLines) {
         if (line.startsWith('@@')) {
-            // Парсим заголовок чанка, чтобы понять, с какой строки начать
             const match = line.match(/@@ -(\d+),\d+ \+(\d+),\d+ @@/);
             if (match) {
                 const startLine = parseInt(match[1]) - 1;
@@ -54,23 +57,19 @@ export function applyPatch(originalCode, diffText) {
                 }
             }
         } else if (line.startsWith('-')) {
-            // Пропускаем удаляемую строку в оригинале
             originalIdx++;
         } else if (line.startsWith('+')) {
-            // Добавляем новую строку
             patchedLines.push(line.substring(1));
         } else {
-            // Контекстная строка (без префикса)
             if (originalIdx < originalLines.length) {
                 patchedLines.push(originalLines[originalIdx]);
                 originalIdx++;
             }
         }
     }
-    // Добавляем оставшиеся строки после патча
     while (originalIdx < originalLines.length) {
         patchedLines.push(originalLines[originalIdx]);
         originalIdx++;
     }
     return patchedLines.join('\n');
-}
+            }
