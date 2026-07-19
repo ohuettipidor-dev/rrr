@@ -22,13 +22,13 @@
 <body>
     <div id="chat"></div>
     <div id="input-area">
-        <input id="input" type="text" placeholder="Общайся, а Творец сам всё улучшит..." autofocus>
+        <input id="input" type="text" placeholder="Общайся, Творец и Доктор работают в фоне..." autofocus>
         <button id="send" onclick="sendMessage()">→</button>
     </div>
 
     <script>
         // ==========================================
-        // НЕЙРОНЫ: РЕФЛЕКС, ДАТЧИКИ, ИНТЕЛЛЕКТ, ТВОРЕЦ
+        // 1. БОЕВОЕ ЯДРО (Рефлекс, Датчики, Интеллект)
         // ==========================================
         const reflexAnswers = {
             "привет": "👋 Здорово, Архитектор! Чем займёмся?",
@@ -96,22 +96,111 @@
         }
 
         // ==========================================
-        // ТВОРЕЦ (автономный конструктор)
+        // 2. АВТО-ДОКТОР (Автоматический фикс нейронов)
+        // ==========================================
+        const PROBLEM_TYPES = [
+            { keywords: ['перегружен', 'облачный разум'], code: 'overload', description: 'Облачный разум временно перегружен' },
+            { keywords: ['контекст', 'не помнит', 'забыл'], code: 'context_lost', description: 'Потеря контекста' },
+            { keywords: ['не как человек', 'слишком робот', 'без души'], code: 'robotic', description: 'Отвечает не как человек' },
+        ];
+        let lastErrorFixed = null;
+
+        async function writeFile(filePath, content, commitMessage) {
+            const token = prompt("Введите GitHub токен (сохранится до закрытия вкладки):");
+            if (!token) return "❌ Токен не введён.";
+            const repo = "ohuettipidor-dev/rrr";
+            const apiUrl = `https://api.github.com/repos/${repo}/contents/${filePath}`;
+            try {
+                let sha = null;
+                const getRes = await fetch(apiUrl, { headers: { "Authorization": `token ${token}` } });
+                if (getRes.ok) { const d = await getRes.json(); sha = d.sha; }
+                const body = { message: commitMessage, content: btoa(unescape(encodeURIComponent(content))), ...(sha ? { sha } : {}) };
+                const putRes = await fetch(apiUrl, { method: "PUT", headers: { "Authorization": `token ${token}`, "Content-Type": "application/json" }, body: JSON.stringify(body) });
+                if (putRes.ok) return `✅ Файл \`${filePath}\` успешно обновлён.`;
+                const err = await putRes.json(); return `❌ Ошибка: ${err.message}`;
+            } catch (e) { return `❌ Ошибка: ${e.message}`; }
+        }
+
+        async function getPatch(problemCode, currentCode, chatLog) {
+            const PROMPTS = {
+                overload: `Ты — эксперт по JavaScript. Нейрон чат-бота выдаёт ошибку "⚠ Облачный разум временно перегружен". Это значит, что API не отвечает. Исправь код, добавив запасной API (OpenRouter) и увеличь таймаут. Верни ТОЛЬКО unified diff.`,
+                context_lost: `Ты — эксперт по JavaScript. Нейрон чат-бота потерял контекст диалога и отвечает как в первый раз. Исправь код так, чтобы он хранил историю сообщений (conversationHistory) и передавал её в каждом запросе. Верни ТОЛЬКО unified diff.`,
+                robotic: `Ты — эксперт по JavaScript. Нейрон чат-бота отвечает слишком сухо и без души. Измени системный промпт (system prompt) так, чтобы он был более дерзким и человечным. Верни ТОЛЬКО unified diff.`
+            };
+            const systemPrompt = PROMPTS[problemCode] || "Ты — эксперт по JavaScript. Исправь ошибку в коде нейрона. Верни ТОЛЬКО unified diff.";
+            const fullPrompt = `${systemPrompt}\n\nВот лог чата:\n\`\`\`\n${chatLog.join('\n')}\n\`\`\`\n\nВот текущий код нейрона:\n\`\`\`javascript\n${currentCode}\n\`\`\``;
+            try {
+                const controller = new AbortController(); const t = setTimeout(() => controller.abort(), 8000);
+                const r = await fetch("https://text.pollinations.ai/openai", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ model: "gpt-4o-mini", messages: [{ role: "user", content: fullPrompt }], temperature: 0.2, max_tokens: 600 }), signal: controller.signal });
+                clearTimeout(t);
+                if (!r.ok) return null;
+                const d = await r.json(); const c = d.choices?.[0]?.message?.content;
+                return c && c.includes('@@') ? c : null;
+            } catch { return null; }
+        }
+
+        function applyPatch(originalCode, diffText) {
+            const originalLines = originalCode.split('\n');
+            const diffLines = diffText.split('\n');
+            const patchedLines = []; let originalIdx = 0;
+            for (const line of diffLines) {
+                if (line.startsWith('@@')) {
+                    const match = line.match(/@@ -(\d+),\d+ \+(\d+),\d+ @@/);
+                    if (match) { const startLine = parseInt(match[1]) - 1; while (originalIdx < startLine && originalIdx < originalLines.length) { patchedLines.push(originalLines[originalIdx]); originalIdx++; } }
+                } else if (line.startsWith('-')) { originalIdx++; }
+                else if (line.startsWith('+')) { patchedLines.push(line.substring(1)); }
+                else { if (originalIdx < originalLines.length) { patchedLines.push(originalLines[originalIdx]); originalIdx++; } }
+            }
+            while (originalIdx < originalLines.length) { patchedLines.push(originalLines[originalIdx]); originalIdx++; }
+            return patchedLines.join('\n');
+        }
+
+        async function fetchCurrentCode() {
+            try {
+                const r = await fetch('https://raw.githubusercontent.com/ohuettipidor-dev/rrr/main/neurons/neuron_intellect.js');
+                return r.ok ? await r.text() : null;
+            } catch { return null; }
+        }
+
+        async function autoDoctorCheck(responseText) {
+            const now = Date.now();
+            if (lastErrorFixed && (now - lastErrorFixed < 60000)) return;
+            for (const problem of PROBLEM_TYPES) {
+                if (problem.keywords.some(kw => responseText.toLowerCase().includes(kw))) {
+                    console.log(`🚨 Авто-Доктор: "${problem.description}". Запускаю исправление...`);
+                    lastErrorFixed = now;
+                    const currentCode = await fetchCurrentCode();
+                    if (currentCode) {
+                        const diff = await getPatch(problem.code, currentCode, chatLog.slice(-10));
+                        if (diff) {
+                            const newCode = applyPatch(currentCode, diff);
+                            if (newCode && newCode !== currentCode) {
+                                const writeResult = await writeFile('neurons/neuron_intellect.js', newCode, '🛠 Авто-фикс: ' + problem.description);
+                                addMsg('bot', `🛠 Авто-Доктор: "${problem.description}".\n${writeResult}`);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // ==========================================
+        // 3. ТВОРЕЦ (Создаёт новые функции на лету)
         // ==========================================
         const chatLog = [];
         let lastCreationTime = 0;
 
         async function creatorCycle() {
             const now = Date.now();
-            if (now - lastCreationTime < 120000) return; // Не чаще раза в 2 минуты
+            if (now - lastCreationTime < 120000) return;
             lastCreationTime = now;
 
             try {
-                // 1. Собираем контекст
                 const recentLog = chatLog.slice(-10).join('\n');
                 if (!recentLog) return;
 
-                // 2. Запрашиваем идею для улучшения
+                addMsg('bot', '🧬 Творец: анализирую диалог, чтобы придумать новую функцию...');
+                
                 const ideaPrompt = `Ты — гениальный архитектор нейросетей. Посмотри на лог чата:
 \`\`\`
 ${recentLog}
@@ -127,9 +216,8 @@ ${recentLog}
                 const idea = ideaData.choices?.[0]?.message?.content;
                 if (!idea) return;
 
-                console.log("💡 Творец придумал:", idea);
+                addMsg('bot', `💡 Творец придумал: "${idea}". Генерирую код...`);
 
-                // 3. Генерируем код новой функции
                 const codePrompt = `Ты — эксперт по JavaScript. Напиши код нейрона (функцию \`process(prompt)\`) который делает следующее: ${idea}
 Код должен быть в виде ЕДИНОЙ строки, которую можно вставить в \`eval()\`. Например: \`async function(prompt) { return "Привет!"; }\`
 Не используй export. Не используй import. Только чистый JS.`;
@@ -143,26 +231,26 @@ ${recentLog}
                 const code = codeData.choices?.[0]?.message?.content;
                 if (!code) return;
 
-                // 4. Пытаемся безопасно запустить код
                 try {
                     const newFunc = eval(`(${code})`);
                     if (typeof newFunc === 'function') {
-                        // Тестируем функцию
                         const testResult = await newFunc("тест");
                         if (testResult) {
-                            addMsg('bot', `🧬 Творец создал новую функцию: "${idea}"`);
+                            addMsg('bot', `✅ Творец успешно создал новую функцию и она работает!`);
+                        } else {
+                            addMsg('bot', `⚠ Творец создал функцию, но она не вернула результат.`);
                         }
                     }
                 } catch (e) {
-                    console.warn("⚠ Творец создал нерабочий код:", e.message);
+                    addMsg('bot', `❌ Творец создал нерабочий код: ${e.message}`);
                 }
             } catch (e) {
                 console.warn("⚠ Ошибка в цикле Творца:", e.message);
             }
         }
 
-        // Запускаем Творца в фоне каждые 60 секунд
-        setInterval(creatorCycle, 60000);
+        // Запускаем Творца в фоне каждые 2 минуты
+        setInterval(creatorCycle, 120000);
 
         // ==========================================
         // ДИСПЕТЧЕР
@@ -176,6 +264,11 @@ ${recentLog}
             result = await processSensors(q);
             if (result) return result;
             result = await processIntellect(q);
+            
+            // Авто-Доктор проверяет ответ на ошибки
+            if (result && typeof result === 'string') {
+                autoDoctorCheck(result);
+            }
             return result;
         }
 
@@ -209,7 +302,7 @@ ${recentLog}
         };
 
         inputEl.addEventListener("keydown", e => { if (e.key === "Enter") sendMessage(); });
-        addMsg("bot", "👋 Привет, Архитектор! Я Рой Кванто Эволюционный. Общайся со мной, а Творец будет сам придумывать и добавлять новые функции.");
+        addMsg("bot", "👋 Привет, Архитектор! Я Рой Кванто Эволюционный. Творец и Авто-Доктор работают в фоне.");
     </script>
 </body>
 </html>
