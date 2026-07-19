@@ -2,239 +2,123 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Рой Кванто — Живой Доктор</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ИИ Агент — Браузерный</title>
     <style>
-        :root { --bg: #0a0a0f; --chat-bg: #13131c; --user-msg: #1e3a5f; --bot-msg: #3a2a5f; --text: #e0e0e0; --accent: #ff4d6a; }
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); height: 100vh; display: flex; flex-direction: column; padding: 8px; }
-        #chat { flex: 1; overflow-y: auto; background: var(--chat-bg); border-radius: 16px; padding: 16px; margin-bottom: 8px; }
-        .msg { margin-bottom: 14px; display: flex; flex-direction: column; }
-        .user { align-items: flex-end; } .bot { align-items: flex-start; }
-        .bubble { max-width: 85%; padding: 10px 14px; border-radius: 16px; word-break: break-word; line-height: 1.4; white-space: pre-wrap; }
-        .user .bubble { background: var(--user-msg); } .bot .bubble { background: var(--bot-msg); }
-        #input-area { display: flex; gap: 8px; }
-        #input { flex: 1; padding: 12px; border-radius: 24px; border: none; background: #1a1a2a; color: #fff; font-size: 16px; }
-        #send { background: var(--accent); border: none; border-radius: 50%; width: 48px; height: 48px; color: #fff; font-size: 20px; cursor: pointer; }
-        #send:disabled { opacity: 0.5; }
+        body { font-family: Arial; background: #0a0a0f; color: #e0e0e0; padding: 20px; }
+        #output { background: #13131c; border-radius: 10px; padding: 20px; min-height: 200px; white-space: pre-wrap; }
+        input { width: 100%; padding: 10px; margin-top: 10px; background: #1a1a2a; border: none; color: #fff; }
+        button { padding: 10px 20px; margin-top: 10px; background: #ff4d6a; border: none; color: #fff; cursor: pointer; }
     </style>
 </head>
 <body>
-    <div id="chat"></div>
-    <div id="input-area">
-        <input id="input" type="text" placeholder="Спроси что угодно..." autofocus>
-        <button id="send" onclick="sendMessage()">→</button>
-    </div>
+    <h1>ИИ Агент (Браузерный)</h1>
+    <div id="output"></div>
+    <input id="prompt" type="text" placeholder="Введи задачу...">
+    <button onclick="run()">Выполнить</button>
 
     <script>
-        // ==========================================
-        // 1. БОЕВОЕ ЯДРО (Рефлекс, Датчики, Интеллект)
-        // ==========================================
-        const reflexAnswers = {
-            "привет": "👋 Здорово, Архитектор! Чем займёмся?",
-            "как дела": "✅ Отлично! Все нейроны активны. А ты как?",
-            "что ты умеешь": "Я могу поддержать беседу, искать погоду, новости и писать код. Всё благодаря своему Рою.",
-            "как тебя зовут": "Я — Рой Кванто. Младший брат DeepSeek, созданный Архитектором Артёмом.",
-            "кто тебя создал": "Великий Архитектор Гончаров. И ещё немножко я сам.",
-            "спасибо": "Обращайся, Архитектор. Я здесь именно для этого.",
-            "расскажи анекдот": "Почему программисты путают Рождество и Хэллоуин? Потому что 31 OCT = 25 DEC."
-        };
+        const LLM_URL = "https://text.pollinations.ai/openai";
 
-        async function processReflex(prompt) {
-            const q = prompt.toLowerCase();
-            for (const [key, value] of Object.entries(reflexAnswers)) {
-                if (q.includes(key)) return value;
-            }
-            return null;
-        }
+        // Системный промпт для агента
+        const SYSTEM_PROMPT = `Ты — автономный ИИ-агент. Твоя задача — отвечать на запросы пользователя, используя доступные тебе инструменты. Ты можешь использовать следующие функции:
 
-        async function processSensors(prompt) {
-            const q = prompt.toLowerCase();
-            const weatherMatch = q.match(/погода\s+(?:в\s+)?([а-яё\-]+)/i);
-            if (weatherMatch) {
-                try {
-                    const city = weatherMatch[1];
-                    const geoRes = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(city)}&count=1&language=ru`);
-                    const geoData = await geoRes.json();
-                    if (!geoData.results || geoData.results.length === 0) return `🌤 Город "${city}" не найден.`;
-                    const { latitude, longitude, name } = geoData.results[0];
-                    const weatherRes = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current_weather=true`);
-                    const weatherData = await weatherRes.json();
-                    const temp = weatherData.current_weather.temperature;
-                    const windSpeed = weatherData.current_weather.windspeed;
-                    return `🌤 Погода в ${name}: 🌡 ${temp}°C, ветер ${windSpeed} м/с`;
-                } catch (e) { return "⚠ Не могу получить погоду."; }
-            }
-            if (q.includes("новост")) return "📰 Новости временно недоступны.";
+1. search_wikipedia(query) — найти информацию по запросу в Википедии.
+2. run_code(code) — выполнить JavaScript-код и вернуть результат.
+3. write_file(filename, content) — записать файл в репозиторий GitHub.
+
+Если ты хочешь использовать инструмент, напиши в ответе ТОЛЬКО валидный JSON вида:
+{"action": "tool", "tool": "имя_инструмента", "args": {"arg1": "value1", ...}}
+
+Если у тебя готов финальный ответ, напиши JSON вида:
+{"action": "final", "answer": "Твой ответ пользователю"}
+
+Не пиши ничего, кроме этого JSON.`;
+
+        // Инструмент 1: Поиск в Википедии
+        async function search_wikipedia(query) {
             try {
-                const searchRes = await fetch(`https://ru.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(prompt)}`);
-                const searchData = await searchRes.json();
-                if (searchData.extract) return searchData.extract;
-            } catch (e) {}
-            return null;
+                const r = await fetch(`https://ru.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(query)}`);
+                const d = await r.json();
+                return d.extract || "Ничего не найдено.";
+            } catch (e) { return "Ошибка поиска."; }
         }
 
-        const conversationHistory = [];
-        async function processIntellect(prompt) {
-            conversationHistory.push({ role: "user", content: prompt });
-            if (conversationHistory.length > 6) conversationHistory.splice(0, conversationHistory.length - 6);
-            try {
-                const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), 5000);
-                const response = await fetch("https://text.pollinations.ai/openai", {
-                    method: "POST", headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ model: "gpt-4o-mini", messages: [{ role: "system", content: "Ты Кванто — дерзкий и умный ИИ-соратник. Говори только на русском. Отвечай кратко, по делу." }, ...conversationHistory], temperature: 0.8, max_tokens: 200 }),
-                    signal: controller.signal
-                });
-                clearTimeout(timeoutId);
-                if (!response.ok) throw new Error(`HTTP ${response.status}`);
-                const data = await response.json();
-                const content = data.choices?.[0]?.message?.content;
-                if (content) { conversationHistory.push({ role: "assistant", content: content }); return content; }
-                return "🤔 Спроси иначе.";
-            } catch (e) { return "⚠ Облачный разум временно перегружен."; }
+        // Инструмент 2: Выполнение JavaScript
+        async function run_code(code) {
+            try { return String(eval(code)); } catch (e) { return "Ошибка: " + e.message; }
         }
 
-        // ==========================================
-        // 2. ДОКТОР-ХИРУРГ (полный цикл: запрос токена → исправление → отчёт)
-        // ==========================================
-        const chatLog = [];
-        let lastErrorFixed = 0;
-
-        async function fetchCurrentCode() {
-            try {
-                const r = await fetch('https://raw.githubusercontent.com/ohuettipidor-dev/rrr/main/neurons/neuron_intellect.js');
-                return r.ok ? await r.text() : null;
-            } catch { return null; }
-        }
-
-        async function writeFile(filePath, content, commitMessage) {
+        // Инструмент 3: Запись файла в GitHub
+        async function write_file(filename, content) {
             let token = sessionStorage.getItem('gh_token');
             if (!token) {
-                token = prompt("Введите GitHub токен (сохранится до закрытия вкладки):");
-                if (!token) return "❌ Токен не введён.";
+                token = prompt("Введите GitHub токен для записи:");
+                if (!token) return "Токен не введён.";
                 sessionStorage.setItem('gh_token', token);
             }
             const repo = "ohuettipidor-dev/rrr";
-            const apiUrl = `https://api.github.com/repos/${repo}/contents/${filePath}`;
+            const apiUrl = `https://api.github.com/repos/${repo}/contents/${filename}`;
             try {
                 let sha = null;
                 const getRes = await fetch(apiUrl, { headers: { "Authorization": `token ${token}` } });
                 if (getRes.ok) { const d = await getRes.json(); sha = d.sha; }
-                const body = { message: commitMessage, content: btoa(unescape(encodeURIComponent(content))), ...(sha ? { sha } : {}) };
-                const putRes = await fetch(apiUrl, { method: "PUT", headers: { "Authorization": `token ${token}`, "Content-Type": "application/json" }, body: JSON.stringify(body) });
-                if (putRes.ok) return `✅ Файл \`${filePath}\` успешно обновлён.`;
-                const err = await putRes.json(); return `❌ Ошибка: ${err.message}`;
-            } catch (e) { return `❌ Ошибка: ${e.message}`; }
-        }
-
-        async function doctorSurgery(problemCode, problemDesc) {
-            const now = Date.now();
-            if (now - lastErrorFixed < 60000) {
-                addMsg('bot', '⏳ Доктор: недавно уже чинил, жду минуту.');
-                return;
-            }
-            lastErrorFixed = now;
-            addMsg('bot', `🚑 Доктор: обнаружена проблема "${problemDesc}". Запрашиваю текущий код...`);
-            const currentCode = await fetchCurrentCode();
-            if (!currentCode) {
-                addMsg('bot', '❌ Доктор: не могу получить код нейрона.');
-                return;
-            }
-            addMsg('bot', '🧠 Доктор: анализирую код и генерирую исправление...');
-            const prompt = `Ты — эксперт по JavaScript. Исправь ошибку в коде нейрона чат-бота.
-Проблема: ${problemDesc}
-Вот текущий код нейрона:
-\`\`\`javascript
-${currentCode}
-\`\`\`
-Верни ТОЛЬКО исправленный код полностью. Никаких пояснений.`;
-            try {
-                const controller = new AbortController();
-                const t = setTimeout(() => controller.abort(), 10000);
-                const r = await fetch("https://text.pollinations.ai/openai", {
-                    method: "POST", headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ model: "gpt-4o-mini", messages: [{ role: "user", content: prompt }], temperature: 0.3, max_tokens: 600 }),
-                    signal: controller.signal
+                const body = {
+                    message: `Агент: запись ${filename}`,
+                    content: btoa(unescape(encodeURIComponent(content))),
+                    ...(sha ? { sha } : {})
+                };
+                const putRes = await fetch(apiUrl, {
+                    method: "PUT",
+                    headers: { "Authorization": `token ${token}`, "Content-Type": "application/json" },
+                    body: JSON.stringify(body)
                 });
-                clearTimeout(t);
-                if (!r.ok) { addMsg('bot', '❌ Доктор: не смог связаться с LLM.'); return; }
-                const d = await r.json();
-                const newCode = d.choices?.[0]?.message?.content;
-                if (!newCode || newCode === currentCode) { addMsg('bot', '❌ Доктор: LLM не предложила изменений.'); return; }
-                addMsg('bot', '📝 Доктор: сохраняю исправленный код в репозиторий...');
-                const result = await writeFile('neurons/neuron_intellect.js', newCode, '🛠 Авто-хирургия: ' + problemDesc);
-                addMsg('bot', `🛠 Доктор: ${result}`);
-            } catch (e) {
-                addMsg('bot', `❌ Доктор: ошибка — ${e.message}`);
+                if (putRes.ok) return `Файл ${filename} успешно записан.`;
+                else { const e = await putRes.json(); return "Ошибка: " + e.message; }
+            } catch (e) { return "Ошибка: " + e.message; }
+        }
+
+        const TOOLS = { search_wikipedia, run_code, write_file };
+
+        // Функция вызова LLM
+        async function ask_llm(messages) {
+            const r = await fetch(LLM_URL, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ model: "gpt-4o-mini", messages, temperature: 0.3, max_tokens: 200 })
+            });
+            const d = await r.json();
+            return d.choices?.[0]?.message?.content;
+        }
+
+        // Главный цикл агента
+        async function run_agent(user_prompt) {
+            const messages = [
+                { role: "system", content: SYSTEM_PROMPT },
+                { role: "user", content: user_prompt }
+            ];
+            for (let i = 0; i < 5; i++) {
+                const response = await ask_llm(messages);
+                if (!response) return "LLM не отвечает.";
+                try {
+                    const action = JSON.parse(response);
+                    if (action.action === "final") return action.answer;
+                    if (action.action === "tool" && TOOLS[action.tool]) {
+                        const result = await TOOLS[action.tool](...(Object.values(action.args || {})));
+                        messages.push({ role: "assistant", content: response });
+                        messages.push({ role: "user", content: `Результат ${action.tool}: ${result}` });
+                    } else return response;
+                } catch (e) { return response; }
             }
+            return "Достигнут лимит итераций.";
         }
 
-        const PROBLEM_TRIGGERS = [
-            { keywords: ['перегружен', 'облачный разум'], desc: 'Облачный разум временно перегружен' },
-            { keywords: ['контекст', 'не помнит', 'забыл'], desc: 'Потеря контекста' },
-            { keywords: ['не как человек', 'слишком робот', 'без души'], desc: 'Отвечает не как человек' },
-        ];
-
-        async function autoDoctorCheck(responseText) {
-            for (const trigger of PROBLEM_TRIGGERS) {
-                if (trigger.keywords.some(kw => responseText.toLowerCase().includes(kw))) {
-                    doctorSurgery('generic', trigger.desc);
-                    break;
-                }
-            }
+        async function run() {
+            const prompt = document.getElementById("prompt").value;
+            document.getElementById("output").textContent = "Выполняю...";
+            const answer = await run_agent(prompt);
+            document.getElementById("output").textContent = answer;
         }
-
-        // ==========================================
-        // ДИСПЕТЧЕР
-        // ==========================================
-        async function dispatch(prompt) {
-            const q = prompt.trim();
-            chatLog.push(`Архитектор: ${q}`);
-
-            let result = await processReflex(q);
-            if (result) return result;
-            result = await processSensors(q);
-            if (result) return result;
-            result = await processIntellect(q);
-            
-            if (result && typeof result === 'string') {
-                autoDoctorCheck(result);
-            }
-            return result;
-        }
-
-        // ==========================================
-        // ИНТЕРФЕЙС ЧАТА
-        // ==========================================
-        const chatEl = document.getElementById("chat");
-        const inputEl = document.getElementById("input");
-        const sendBtn = document.getElementById("send");
-
-        function addMsg(role, text) {
-            const div = document.createElement("div");
-            div.className = `msg ${role}`;
-            div.innerHTML = `<div class="bubble">${text.replace(/\n/g, "<br>")}</div>`;
-            chatEl.appendChild(div);
-            chatEl.scrollTop = chatEl.scrollHeight;
-        }
-
-        window.sendMessage = async () => {
-            const text = inputEl.value.trim();
-            if (!text) return;
-            addMsg("user", text);
-            inputEl.value = "";
-            inputEl.disabled = sendBtn.disabled = true;
-            addMsg("bot", "Думаю...");
-            const answer = await dispatch(text);
-            chatEl.lastChild.remove();
-            addMsg("bot", answer);
-            inputEl.disabled = sendBtn.disabled = false;
-            inputEl.focus();
-        };
-
-        inputEl.addEventListener("keydown", e => { if (e.key === "Enter") sendMessage(); });
-        addMsg("bot", "👋 Привет, Архитектор! Я Рой Кванто с живым Доктором. Если Интеллект выдаст ошибку, Доктор сам всё исправит и напишет об этом в чат.");
     </script>
 </body>
 </html>
