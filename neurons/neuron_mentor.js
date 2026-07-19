@@ -1,106 +1,49 @@
-// Нейрон 0: Наставник — Автономный инженер с динамическим кодом
+// Нейрон 0: Наставник (с Диагностом)
 import { writeFile } from './neuron_github.js';
+import { generateFix, applyPatch } from './neuron_diagnost.js';
 
 const reportCard = [];
-
-// Генерирует новый код для исправления ошибки, используя облачный ИИ
-async function generateFix(errorDescription) {
-    const prompt = `Ты — эксперт по JavaScript. Пользователь сообщил об ошибке в системе: "${errorDescription}".
-Система использует API Pollinations (https://text.pollinations.ai/openai) для диалогов.
-Предложи исправление кода для файла neurons/neuron_intellect.js.
-Учти, что проблема может быть в таймауте, формате ответа, контексте или недоступности API.
-Верни ТОЛЬКО полный код файла, без пояснений.`;
-    
-    try {
-        const response = await fetch("https://text.pollinations.ai/openai", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-                model: "gpt-4o-mini",
-                messages: [{ role: "user", content: prompt }],
-                temperature: 0.5,
-                max_tokens: 500
-            })
-        });
-        if (!response.ok) return null;
-        const data = await response.json();
-        return data.choices?.[0]?.message?.content || null;
-    } catch {
-        return null;
-    }
-}
-
-// Стресс-тест после исправления
-async function runStressTest(intellectModule) {
-    const testPrompts = ["Привет", "Как дела?", "Что нового?"];
-    for (const p of testPrompts) {
-        try {
-            const answer = await intellectModule.process(p);
-            if (answer.includes('⚠ Облачный разум временно перегружен')) return false;
-        } catch {
-            return false;
-        }
-    }
-    return true;
-}
+const chatLog = []; // Лог сообщений для контекста
 
 export async function process(prompt) {
     const q = prompt.trim();
+    chatLog.push(`Архитектор: ${q}`);
 
     if (q.startsWith('!хорошо')) {
         reportCard.push({ type: 'good', time: new Date().toISOString() });
-        return "✅ Запомнил.";
+        chatLog.push('Наставник: ✅ Запомнил успех.');
+        return "✅ Понял. Это рабочий подход, запомню.";
     }
 
     if (q.startsWith('!плохо')) {
         const reason = q.replace('!плохо', '').trim() || 'не указана';
         reportCard.push({ type: 'bad', reason, time: new Date().toISOString() });
 
-        let report = `📝 Проблема: "${reason}".\n🔄 Запускаю авто-фикс (динамический)...\n`;
-        let success = false;
-        const maxAttempts = 5;
-
-        for (let i = 1; i <= maxAttempts; i++) {
-            report += `\n🔧 Попытка ${i}/${maxAttempts}: генерирую исправление...`;
-            
-            const newCode = await generateFix(reason);
-            if (!newCode) {
-                report += `\n❌ Не удалось сгенерировать код.`;
-                continue;
-            }
-
-            const writeResult = await writeFile('neurons/neuron_intellect.js', newCode, `🛠 Авто-фикс (попытка ${i})`);
-            report += `\n   ${writeResult}`;
-
-            if (!writeResult.includes('✅')) {
-                report += `\n❌ Ошибка записи, останавливаюсь.`;
-                break;
-            }
-
-            // Ждём обновления GitHub Pages (около 2 секунд)
-            await new Promise(r => setTimeout(r, 2000));
-
-            // Динамически импортируем обновлённый модуль
-            try {
-                const updatedModule = await import(`./neuron_intellect.js?update=${Date.now()}`);
-                success = await runStressTest(updatedModule);
-            } catch {
-                success = false;
-            }
-
-            if (success) {
-                report += `\n✅ Контролёр: стресс-тест пройден! Система восстановлена.`;
-                break;
-            } else {
-                report += `\n❌ Контролёр: тест не пройден. Пробую снова...`;
-            }
+        // 1. Получаем текущий код нейрона
+        const currentCode = await fetchCurrentCode();
+        if (!currentCode) {
+            chatLog.push('Наставник: ❌ Не смог получить текущий код.');
+            return "❌ Не могу получить текущий код нейрона. Проверь соединение.";
         }
 
-        if (!success) {
-            report += `\n🚨 Авто-фикс не смог исправить ошибку за ${maxAttempts} попыток. Требуется ручное вмешательство.`;
+        // 2. Генерируем точечный патч через Диагноста
+        const diff = await generateFix(reason, currentCode, chatLog.slice(-10));
+        if (!diff || !diff.includes('@@')) {
+            chatLog.push('Наставник: ❌ Не смог сгенерировать патч.');
+            return "❌ Не удалось сгенерировать исправление. Попробуй другое описание ошибки.";
         }
 
-        return report;
+        // 3. Применяем патч
+        const newCode = applyPatch(currentCode, diff);
+        if (!newCode || newCode === currentCode) {
+            chatLog.push('Наставник: ❌ Патч не изменил код.');
+            return "❌ Патч не внёс изменений. Возможно, проблема не в этом файле.";
+        }
+
+        // 4. Записываем исправленный файл в репозиторий
+        const writeResult = await writeFile('neurons/neuron_intellect.js', newCode, '🛠 Точечный авто-фикс Диагноста');
+        chatLog.push(`Наставник: ${writeResult}`);
+        return `📝 Записал проблему: "${reason}".\n🔧 Применил точечный патч:\n${writeResult}`;
     }
 
     if (q.includes('статистика') || q.includes('отчёт')) {
@@ -110,4 +53,15 @@ export async function process(prompt) {
     }
 
     return null;
-                }
+}
+
+// Вспомогательная функция для получения текущего кода нейрона из репозитория
+async function fetchCurrentCode() {
+    try {
+        const res = await fetch('https://raw.githubusercontent.com/ohuettipidor-dev/rrr/main/neurons/neuron_intellect.js');
+        if (!res.ok) return null;
+        return await res.text();
+    } catch {
+        return null;
+    }
+}
